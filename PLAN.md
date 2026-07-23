@@ -77,13 +77,13 @@ viral-trend-mvp/
 
 ## 3. Milestones (dicicil — centang kalau kelar)
 
-### M0 — Setup proyek  ⏱️ ~1 sesi
-- [ ] `git init` + `.gitignore` (ignore `data/`, `.env`, `__pycache__`, `.venv`)
-- [ ] Virtualenv: `python -m venv .venv`
-- [ ] `requirements.txt` awal: `fastapi uvicorn sqlmodel httpx apscheduler pydantic-settings jinja2 python-dotenv`
+### M0 — Setup proyek  ✅ SELESAI
+- [x] `git init` + `.gitignore` (ignore `data/`, `.env`, `__pycache__`, `.venv`)
+- [x] Virtualenv: **Python 3.12** (`py -3.12 -m venv .venv`) — catatan: butuh 3.10+ (sintaks `X | None`)
+- [x] `requirements.txt` awal: `fastapi uvicorn sqlmodel httpx apscheduler pydantic-settings jinja2 python-dotenv`
 - [ ] Playwright **opsional** (cuma kalau fallback dipakai): `pip install playwright && playwright install chromium`
-- [ ] `.env.example` + `app/config.py`
-- **Done when:** `uvicorn app.api:app` nyala walau kosong.
+- [x] `.env.example` + `app/config.py`
+- **Done when:** `uvicorn app.api:app` nyala walau kosong. ✅ `/health`=200, DB `trends.db` kebentuk otomatis.
 
 ### M1 — Scraper spike: Creative Center (BUKTIKAN DATA BISA DIAMBIL)  ⏱️ ~1–2 sesi
 - [ ] Pelajari struktur endpoint JSON Creative Center (ref repo `lofe-w/...` — **pahami**, jangan copy buta)
