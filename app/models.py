@@ -1,0 +1,28 @@
+from datetime import date, datetime
+
+from sqlmodel import Field, SQLModel
+
+
+class Trend(SQLModel, table=True):
+    """Satu tren unik (sound / hashtag / video) yang dilacak."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    external_id: str = Field(index=True)          # id dari sumber (Creative Center)
+    category: str                                  # "sound" | "hashtag" | "video"
+    name: str
+    url: str | None = None
+    region: str = "ID"
+    vertical: str = "fnb"
+    first_seen: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Snapshot(SQLModel, table=True):
+    """Rekam metrik satu tren pada satu hari. Kumpulannya = histori (aset prediksi)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    trend_id: int = Field(foreign_key="trend.id", index=True)
+    captured_on: date = Field(default_factory=date.today, index=True)
+    views: int | None = None
+    video_count: int | None = None
+    engagement_rate: float | None = None
+    rank: int | None = None
