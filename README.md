@@ -31,8 +31,8 @@ python -m scripts.run_once
 - [x] M0 — Setup proyek (skeleton + API nyala)
 - [x] M1 — Scraper Creative Center (DOM/Playwright, headed) — data nyata
 - [x] M2 — DB + histori harian (idempoten, histori kebukti)
-- [ ] M3 — Metrik viral
-- [ ] M4 — API top-tren
+- [x] M3 — Metrik viral (velocity/growth/status/is_viral)
+- [x] M4 — API top-tren (`/trends`, `/trends/{id}`)
 - [ ] M5 — Dashboard
 - [ ] M6 — Deteksi editing Level 1
 - [ ] M7 — Scheduler harian

@@ -114,10 +114,10 @@ viral-trend-mvp/
 - **Done when:** metrik keluar per trend. ✅ Diverifikasi: histori 2-hari → velocity 9.4M/hari, +18.8%/hari, status "naik", viral=True.
 - ⏳ Catatan: **engagement true** (like/share) belum ada — butuh enrichment (fase 2). Akurasi velocity naik seiring data harian numpuk.
 
-### M4 — API  ⏱️ ~1 sesi
-- [ ] `api.py`: `GET /trends?vertical=fnb&type=sound|hashtag|video` → JSON top tren + metrik
-- [ ] `GET /trends/{id}` → detail + histori snapshot
-- **Done when:** buka `/docs`, endpoint balikin data asli dari DB.
+### M4 — API  ✅ SELESAI
+- [x] `GET /trends?category=&region=&only_viral=&limit=` → top tren + metrik, **terurut viral → velocity → rank**
+- [x] `GET /trends/{id}` → detail + histori snapshot
+- **Done when:** endpoint balikin data asli dari DB. ✅ Diverifikasi via TestClient (sort benar, detail+histori, filter, 404).
 
 ### M5 — Dashboard minimal  ⏱️ ~1–2 sesi
 - [ ] Halaman: tabel/kartu top tren F&B (sound/hashtag/video) + indikator naik-turun
