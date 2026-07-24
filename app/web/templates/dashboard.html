@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ app_name }} — Dashboard</title>
+{% if job.running %}<meta http-equiv="refresh" content="10">{% endif %}
 <style>
   :root{
     --ink:#14232f; --ink2:#33454f; --accent:#b8442d; --accent-soft:#f5ebe6;
@@ -48,6 +49,17 @@
   .num{font-variant-numeric:tabular-nums;}
   .vel-pos{color:var(--green);font-weight:600;}
   .vel-na{color:var(--gray);}
+  .btn{font-size:13px;font-weight:700;padding:8px 15px;border-radius:20px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;font-family:inherit;}
+  .btn:hover:not(:disabled){background:var(--accent);border-color:var(--accent);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  .job{padding:11px 15px;border-radius:8px;font-size:13px;margin:12px 0;display:flex;align-items:center;gap:9px;}
+  .job.run{background:#fbeee0;border:1px solid #e8c9a3;color:#7a4d18;}
+  .job.ok{background:#e4efe7;border:1px solid #bcd6c5;color:#2c5e42;}
+  .job.err{background:#fdeceb;border:1px solid #f0c4c0;color:#9c3228;}
+  .spin{width:13px;height:13px;border:2px solid #d9b48a;border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:sp .8s linear infinite;flex:none;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
   .inds{gap:6px;margin:10px 0 14px;}
   .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-right:2px;}
   .chip{font-size:12px;padding:5px 11px;border:1px solid var(--rule);border-radius:14px;background:#fff;color:var(--ink2);font-weight:500;}
@@ -87,6 +99,21 @@
     <div class="stat viral"><div class="n">{{ viral_count }}</div><div class="l">Sedang viral</div></div>
   </div>
 
+  {% if job.running %}
+  <div class="job run">
+    <span class="spin"></span>
+    <b>Mengambil data baru…</b> jendela Chrome akan terbuka — jangan ditutup.
+    Berjalan {{ job.elapsed }} detik (biasanya ~3 menit). Halaman ini menyegarkan sendiri.
+  </div>
+  {% elif job.error %}
+  <div class="job err"><b>Refresh gagal:</b> {{ job.error }}</div>
+  {% elif job.result %}
+  <div class="job ok">
+    <b>Data diperbarui</b> {{ job.finished_at }} — +{{ job.result.new_trends }} tren baru,
+    {{ job.result.snapshots }} snapshot.
+  </div>
+  {% endif %}
+
   <div class="toolbar">
     <a class="tab {% if category=='hashtag' %}active{% endif %}" href="/?category=hashtag{% if only_viral %}&only_viral=true{% endif %}">Hashtag</a>
     <span class="tab off" title="segera">Sound</span>
@@ -94,6 +121,11 @@
     <a class="toggle {% if only_viral %}on{% endif %}" href="/?category={{ category }}{% if not only_viral %}&only_viral=true{% endif %}">
       {% if only_viral %}✓ {% endif %}Hanya viral
     </a>
+    <form method="post" action="/refresh" style="display:inline">
+      <button class="btn" {% if job.running %}disabled{% endif %}>
+        {% if job.running %}Sedang berjalan…{% else %}↻ Ambil data baru{% endif %}
+      </button>
+    </form>
   </div>
 
   {% if industries %}

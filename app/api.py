@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
+from app import jobs
 from app.config import settings
 from app.db import get_session, init_db
 from app.metrics import compute
@@ -120,6 +121,24 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
     return detail
 
 
+@app.post("/refresh")
+def refresh(quick: bool = False):
+    """Mulai ambil data baru di background lalu balik ke dashboard.
+
+    quick=True: hanya F&B periode 7 hari (~30 detik) buat cek cepat.
+    """
+    kwargs = (
+        {"periods": (7,), "industries": ("Food & Beverage",)} if quick else {}
+    )
+    jobs.start_refresh(**kwargs)  # kalau sudah jalan, diabaikan
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/refresh/status")
+def refresh_status():
+    return jobs.status()
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -147,5 +166,6 @@ def dashboard(
             "viral_count": viral_count,
             "industries": industries,
             "industry": industry,
+            "job": jobs.status(),
         },
     )

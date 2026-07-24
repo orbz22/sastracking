@@ -28,6 +28,11 @@ cp .env.example .env
 .venv\Scripts\python.exe -m scripts.run_once
 ```
 
+> Ambil data baru bisa lewat **tombol "↻ Ambil data baru"** di dashboard —
+> jalan di background (~3 menit), halaman menyegarkan sendiri. Tidak perlu
+> perintah `run_once` lagi. Jendela Chrome akan terbuka saat proses berjalan;
+> jangan ditutup.
+
 Kalau mau aktivasi venv dulu (biar bisa ketik `uvicorn`/`python` langsung):
 
 ```powershell
