@@ -85,13 +85,14 @@ viral-trend-mvp/
 - [x] `.env.example` + `app/config.py`
 - **Done when:** `uvicorn app.api:app` nyala walau kosong. ✅ `/health`=200, DB `trends.db` kebentuk otomatis.
 
-### M1 — Scraper spike: Creative Center  ✅ MEKANISME PROVEN (sebagian)
+### M1 — Scraper spike: Creative Center  ✅ PROVEN + F&B filter
 - [x] `scrapers/base.py`: interface `fetch_trends(...) -> list[dict]`
 - [x] `scrapers/creative_center.py` + `scripts/run_once.py`: narik tren hashtag ID nyata (posts/views)
-- [ ] Filter industri **F&B** (skrg default "All" — perlu param/dropdown industry_id)
-- [ ] Login (akun TikTok Business) buka "View more" → ≥10–100 baris (anon cap 3)
+- [x] **Filter industri F&B** — via klik UI dropdown (`_select_industry`), parser tahan multi-tag industri
+- [~] **Login** (persistent profile) — scaffold siap: `scripts/login.py` (login manual sekali) + `_load_more` (klik "View more"). **Butuh user login sekali** buat buka >3 baris.
 - [ ] Tambah kategori: trending **sound** + **video** (halaman terpisah)
-- **Done when:** ≥10 tren **F&B** nyata. **Status:** data extraction TERBUKTI jalan; sisa = filter F&B + login buat volume.
+- **Status:** F&B data nyata tampil di dashboard (3 baris anon). Login → 20–100 baris.
+- ⚠️ `headless=True` diblok → **headed**. Scraper pakai **persistent context** (`.pw-profile/`, gitignore).
 
 **Temuan riset lapangan (penting):**
 - Creative Center rebrand → **"TikTok One Creative Suite"**, URL tren: `ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7`

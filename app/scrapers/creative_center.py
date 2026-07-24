@@ -11,6 +11,11 @@ CATEGORY_URL = {
     "hashtag": "https://ads.tiktok.com/creative/creativeCenter/trends/hashtag",
 }
 
+# vertical internal -> label industri di dropdown Creative Center
+INDUSTRY_LABEL = {
+    "fnb": "Food & Beverage",
+}
+
 _NUM_RE = re.compile(r"([\d.]+)\s*([KMB]?)", re.I)
 _MULT = {"": 1, "K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
 
@@ -42,17 +47,25 @@ class CreativeCenterScraper(TrendScraper):
         category: str = "hashtag",
         period: int = 7,
         region: str | None = None,
+        industry: str | None = None,
     ) -> list[dict]:
         region = region or settings.region
+        industry = industry or INDUSTRY_LABEL.get(vertical)
         if category not in CATEGORY_URL:
             raise ValueError(f"kategori belum didukung: {category}")
         url = f"{CATEGORY_URL[category]}?region={region}&period={period}"
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="chrome", headless=self.headless)
-            page = browser.new_context(
-                locale="en-US", viewport={"width": 1366, "height": 1400}
-            ).new_page()
+            # persistent context = sesi login ke-persist (login sekali via scripts/login.py).
+            # Anon: dapat top 3. Login: 'View more' kebuka -> lebih banyak.
+            ctx = p.chromium.launch_persistent_context(
+                settings.profile_dir,
+                channel="chrome",
+                headless=self.headless,
+                locale="en-US",
+                viewport={"width": 1366, "height": 1400},
+            )
+            page = ctx.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60_000)
             try:
                 page.wait_for_function(
@@ -61,34 +74,90 @@ class CreativeCenterScraper(TrendScraper):
             except Exception:
                 pass
             page.wait_for_timeout(3_000)
+            if industry:
+                self._select_industry(page, industry)
+            self._load_more(page)
             text = page.inner_text("body")
-            browser.close()
+            ctx.close()
 
-        return self._parse_hashtags(text, region, period)
+        return self._parse_hashtags(text, region, period, industry)
 
     @staticmethod
-    def _parse_hashtags(text: str, region: str, period: int) -> list[dict]:
+    def _load_more(page, max_clicks: int = 15) -> None:
+        """Klik 'View more' berulang (kalau login) sampai baris berhenti nambah."""
+        for _ in range(max_clicks):
+            before = page.locator("text=See analytics").count()
+            vm = page.get_by_text("View more", exact=True)
+            if vm.count() == 0:
+                break
+            try:
+                vm.first.scroll_into_view_if_needed(timeout=3_000)
+                vm.first.click(timeout=4_000)
+            except Exception:
+                break
+            page.wait_for_timeout(2_500)
+            if page.locator("text=See analytics").count() <= before:
+                break  # anon / ga nambah -> stop
+
+    @staticmethod
+    def _select_industry(page, industry: str) -> None:
+        """Buka dropdown industri (.cc-select pertama) lalu pilih label industri."""
+        try:
+            page.locator(".cc-select").first.click(timeout=8_000)
+            page.wait_for_timeout(700)
+            page.locator(
+                ".byted-select-option-inner-wrapper", has_text=industry
+            ).first.click(timeout=8_000)
+            page.wait_for_timeout(3_500)  # tunggu tabel refresh
+        except Exception as e:  # gagal filter -> lanjut pakai data "All"
+            print(f"[warn] pilih industri '{industry}' gagal: {str(e)[:80]}")
+
+    @staticmethod
+    def _parse_hashtags(
+        text: str, region: str, period: int, industry: str | None = None
+    ) -> list[dict]:
         lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+        n = len(lines)
+        markers = {"Posts", "Views", "See analytics"}
         out: list[dict] = []
         for i, ln in enumerate(lines):
             if not ln.startswith("#"):
                 continue
             name = ln
             rank = int(lines[i - 1]) if i > 0 and lines[i - 1].isdigit() else None
-            industry = lines[i + 1] if i + 1 < len(lines) else None
+
+            # window: sampai baris '#' berikutnya / 'See analytics' / maks 11 baris
+            window: list[str] = []
+            j = i + 1
+            while j < n and j < i + 12 and not lines[j].startswith("#"):
+                window.append(lines[j])
+                if lines[j] == "See analytics":
+                    break
+                j += 1
+
+            # industri = baris pertama yg bukan angka & bukan marker
+            row_industry = None
+            for w in window:
+                if w in markers or w[0].isdigit():
+                    continue
+                row_industry = w
+                break
+
+            # posts/views = angka tepat SEBELUM marker 'Posts'/'Views'
             posts = views = None
-            # pola: [#name, industry, postsval, 'Posts', viewsval, 'Views']
-            if i + 3 < len(lines) and lines[i + 3] == "Posts":
-                posts = _num(lines[i + 2])
-            if i + 5 < len(lines) and lines[i + 5] == "Views":
-                views = _num(lines[i + 4])
+            for k, w in enumerate(window):
+                if w == "Posts" and k > 0:
+                    posts = _num(window[k - 1])
+                elif w == "Views" and k > 0:
+                    views = _num(window[k - 1])
+
             slug = name.lstrip("#")
             out.append(
                 {
                     "external_id": slug,
                     "category": "hashtag",
                     "name": name,
-                    "industry": industry,
+                    "industry": row_industry or industry,
                     "posts": posts,
                     "views": views,
                     "rank": rank,
