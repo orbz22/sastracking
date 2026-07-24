@@ -94,6 +94,16 @@ viral-trend-mvp/
 - **Status:** F&B data nyata tampil di dashboard (3 baris anon). Login → 20–100 baris.
 - ⚠️ `headless=True` diblok → **headed**. Scraper pakai **persistent context** (`.pw-profile/`, gitignore).
 
+**Cakupan tanpa login (hasil riset lanjutan):**
+- Tanpa login, tiap kombinasi filter cuma kasih **~3 baris**. Solusi sah: **sapu banyak kombinasi**, bukan tembus login.
+- `fetch_many()` menyapu **periode (7/30/90) × industri** (F&B + Health, News, Sports, Travel, Household) dalam **satu browser**.
+- Hasil: **3 → 50 hashtag unik** (~17×), ~170 detik. Semua data publik.
+- Jebakan yang sudah ditangani:
+  - Views antar-period tidak sebanding (90h kumulatif) → `period` disimpan per snapshot, metrik hanya banding period sama.
+  - Klik "View more" tanpa login memunculkan **modal login** yang memblokir dropdown → modal ditutup otomatis (Escape) lalu berhenti.
+  - Setelah scroll, dropdown industri keluar viewport → `scroll_into_view` sebelum klik.
+- Opsi berbayar tanpa login TikTok (kalau mau lepas dari scrape lokal): Apify `doliz` Creative Center, EnsembleData, TickerTrends.
+
 **Temuan riset lapangan (penting):**
 - Creative Center rebrand → **"TikTok One Creative Suite"**, URL tren: `ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7`
 - `httpx` langsung ke JSON API → **`40101 no permission`** (butuh signature JS). Buntu.

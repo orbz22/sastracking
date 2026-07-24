@@ -56,10 +56,13 @@ def _collect(
     region: str | None,
     only_viral: bool,
     limit: int = 200,
+    industry: str | None = None,
 ) -> list[dict]:
     q = select(Trend).where(Trend.category == category)
     if region:
         q = q.where(Trend.region == region)
+    if industry:
+        q = q.where(Trend.industry == industry)
     rows: list[dict] = []
     for t in session.exec(q).all():
         snaps = session.exec(select(Snapshot).where(Snapshot.trend_id == t.id)).all()
@@ -86,11 +89,12 @@ def health():
 def list_trends(
     category: str = "hashtag",
     region: str | None = None,
+    industry: str | None = None,
     only_viral: bool = False,
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_session),
 ):
-    rows = _collect(session, category, region, only_viral, limit)
+    rows = _collect(session, category, region, only_viral, limit, industry)
     return {"count": len(rows), "category": category, "trends": rows}
 
 
@@ -120,11 +124,16 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
 def dashboard(
     request: Request,
     category: str = "hashtag",
+    industry: str | None = None,
     only_viral: bool = False,
     session: Session = Depends(get_session),
 ):
-    rows = _collect(session, category, settings.region, only_viral)
+    rows = _collect(session, category, settings.region, only_viral, industry=industry)
     viral_count = sum(1 for r in rows if r["is_viral"])
+    # daftar industri yang tersedia (buat tombol filter)
+    industries = sorted(
+        {t.industry for t in session.exec(select(Trend)).all() if t.industry}
+    )
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
@@ -136,5 +145,7 @@ def dashboard(
             "only_viral": only_viral,
             "trends": rows,
             "viral_count": viral_count,
+            "industries": industries,
+            "industry": industry,
         },
     )

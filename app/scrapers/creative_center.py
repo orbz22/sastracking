@@ -16,6 +16,17 @@ INDUSTRY_LABEL = {
     "fnb": "Food & Beverage",
 }
 
+# Tanpa login tiap kombinasi filter cuma kasih ~3 baris. Sapu beberapa industri
+# yang bersinggungan dgn F&B buat naikin cakupan (tetap data publik, bukan bypass).
+FNB_ADJACENT = (
+    "Food & Beverage",
+    "Health",
+    "News & Entertainment",
+    "Sports & Outdoor",
+    "Travel",
+    "Household Products",
+)
+
 _NUM_RE = re.compile(r"([\d.]+)\s*([KMB]?)", re.I)
 _MULT = {"": 1, "K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
 
@@ -105,7 +116,12 @@ class CreativeCenterScraper(TrendScraper):
 
     @staticmethod
     def _load_more(page, max_clicks: int = 15) -> None:
-        """Klik 'View more' berulang (kalau login) sampai baris berhenti nambah."""
+        """Klik 'View more' berulang (kalau login) sampai baris berhenti nambah.
+
+        Tanpa login, klik ini memunculkan modal 'Log in or sign up' yang menutupi
+        halaman dan bikin interaksi berikutnya (dropdown industri) gagal — jadi
+        modal langsung ditutup lalu berhenti.
+        """
         for _ in range(max_clicks):
             before = page.locator("text=See analytics").count()
             vm = page.get_by_text("View more", exact=True)
@@ -116,22 +132,84 @@ class CreativeCenterScraper(TrendScraper):
                 vm.first.click(timeout=4_000)
             except Exception:
                 break
-            page.wait_for_timeout(2_500)
+            page.wait_for_timeout(2_000)
+
+            # dinding login (anon) -> tutup modal, hentikan
+            if page.locator("[role='dialog'], .byted-modal, .login-modal").count():
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(600)
+                break
             if page.locator("text=See analytics").count() <= before:
-                break  # anon / ga nambah -> stop
+                break  # ga nambah -> stop
+
+    def fetch_many(
+        self,
+        category: str = "hashtag",
+        periods: tuple[int, ...] = (7, 30, 90),
+        industries: tuple[str, ...] = FNB_ADJACENT,
+        region: str | None = None,
+    ) -> list[dict]:
+        """Sapu banyak kombinasi (periode × industri) dalam SATU browser.
+
+        Jauh lebih cepat dari memanggil fetch_trends berulang (yang membuka
+        browser tiap kali). Hasil di-dedup per (external_id, period).
+        """
+        region = region or settings.region
+        if category not in CATEGORY_URL:
+            raise ValueError(f"kategori belum didukung: {category}")
+
+        seen: dict[tuple[str, int], dict] = {}
+        with sync_playwright() as p:
+            ctx = open_context(p, self.headless)
+            page = ctx.new_page()
+            for period in periods:
+                url = f"{CATEGORY_URL[category]}?region={region}&period={period}"
+                page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                try:
+                    page.wait_for_function(
+                        "() => /#\\w/.test(document.body.innerText)", timeout=30_000
+                    )
+                except Exception:
+                    pass
+                page.wait_for_timeout(2_500)
+                for industry in industries:
+                    self._select_industry(page, industry)
+                    self._load_more(page)
+                    rows = self._parse_hashtags(
+                        page.inner_text("body"), region, period, industry
+                    )
+                    for r in rows:
+                        seen.setdefault((r["external_id"], period), r)
+                    print(
+                        f"  [{period:>2}h] {industry:<22} +{len(rows)} "
+                        f"(total unik {len(seen)})"
+                    )
+            ctx.close()
+        return list(seen.values())
 
     @staticmethod
     def _select_industry(page, industry: str) -> None:
-        """Buka dropdown industri (.cc-select pertama) lalu pilih label industri."""
+        """Buka dropdown industri (.cc-select pertama) lalu pilih label industri.
+
+        Wajib scroll balik ke atas dulu: setelah _load_more halaman ter-scroll ke
+        bawah dan dropdown keluar viewport sehingga klik timeout.
+        """
         try:
-            page.locator(".cc-select").first.click(timeout=8_000)
-            page.wait_for_timeout(700)
+            # tutup modal/dropdown sisa dari langkah sebelumnya
+            if page.locator("[role='dialog'], .byted-modal").count():
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(500)
+            sel = page.locator(".cc-select").first
+            sel.scroll_into_view_if_needed(timeout=5_000)
+            page.wait_for_timeout(300)
+            sel.click(timeout=6_000)
+            page.wait_for_timeout(800)
             page.locator(
                 ".byted-select-option-inner-wrapper", has_text=industry
-            ).first.click(timeout=8_000)
+            ).first.click(timeout=6_000)
             page.wait_for_timeout(3_500)  # tunggu tabel refresh
-        except Exception as e:  # gagal filter -> lanjut pakai data "All"
-            print(f"[warn] pilih industri '{industry}' gagal: {str(e)[:80]}")
+        except Exception as e:  # gagal filter -> lanjut pakai data sebelumnya
+            print(f"[warn] pilih industri '{industry}' gagal: {str(e)[:70]}")
 
     @staticmethod
     def _parse_hashtags(
