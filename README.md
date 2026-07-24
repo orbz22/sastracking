@@ -33,6 +33,6 @@ python -m scripts.run_once
 - [x] M2 — DB + histori harian (idempoten, histori kebukti)
 - [x] M3 — Metrik viral (velocity/growth/status/is_viral)
 - [x] M4 — API top-tren (`/trends`, `/trends/{id}`)
-- [ ] M5 — Dashboard
+- [x] M5 — Dashboard (`GET /` — tabel + badge + filter)
 - [ ] M6 — Deteksi editing Level 1
 - [ ] M7 — Scheduler harian

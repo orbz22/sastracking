@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ app_name }} — Dashboard</title>
+<style>
+  :root{
+    --ink:#14232f; --ink2:#33454f; --accent:#b8442d; --accent-soft:#f5ebe6;
+    --rule:#e2e6ea; --muted:#6b7a85; --panel:#f7f6f4; --bg:#fbfaf8;
+    --green:#2f7d4f; --amber:#a8621c; --red:#c0392b; --gray:#8894a0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 60px;}
+
+  header{border-bottom:2.5px solid var(--ink);padding-bottom:14px;margin-bottom:18px;}
+  .kicker{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  h1{font-family:Georgia,serif;font-size:26px;margin:6px 0 2px;letter-spacing:-.3px;}
+  .sub{color:var(--muted);font-size:13px;}
+  .meta{margin-left:auto;text-align:right;font-size:12px;color:var(--muted);}
+  .headrow{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+
+  .stats{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;}
+  .stat{background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px 18px;min-width:120px;}
+  .stat .n{font-size:24px;font-weight:700;font-family:Georgia,serif;}
+  .stat.viral{background:var(--accent);border-color:var(--accent);}
+  .stat.viral .n{color:#fff;}
+  .stat.viral .l{color:#f7ddd3;}
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+  .toolbar{display:flex;gap:8px;align-items:center;margin:14px 0;flex-wrap:wrap;}
+  .tab{padding:7px 14px;border:1px solid var(--rule);border-radius:20px;font-size:13px;font-weight:600;background:#fff;color:var(--ink2);}
+  .tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .tab.off{opacity:.45;cursor:not-allowed;}
+  .toggle{margin-left:auto;font-size:13px;padding:7px 14px;border:1px solid var(--rule);border-radius:20px;background:#fff;font-weight:600;}
+  .toggle.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden;}
+  th{background:var(--ink);color:#fff;text-align:left;font-size:11px;letter-spacing:.4px;text-transform:uppercase;padding:10px 12px;font-weight:600;}
+  td{padding:11px 12px;border-top:1px solid var(--rule);font-size:14px;vertical-align:middle;}
+  tr:hover td{background:var(--panel);}
+  .rank{font-family:Georgia,serif;font-weight:700;font-size:16px;color:var(--ink2);width:38px;}
+  .name{font-weight:600;}
+  .name a:hover{color:var(--accent);text-decoration:underline;}
+  .ind{font-size:11px;color:var(--muted);}
+  .num{font-variant-numeric:tabular-nums;}
+  .vel-pos{color:var(--green);font-weight:600;}
+  .vel-na{color:var(--gray);}
+
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:12px;text-transform:capitalize;}
+  .b-naik{background:#e4efe7;color:var(--green);}
+  .b-puncak{background:#fbeee0;color:var(--amber);}
+  .b-turun{background:#fdeceb;color:var(--red);}
+  .b-baru{background:#eef1f3;color:var(--gray);}
+  .viral{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.5px;padding:2px 8px;border-radius:12px;background:var(--accent);color:#fff;margin-left:6px;}
+
+  .empty{padding:40px;text-align:center;color:var(--muted);background:#fff;border:1px dashed var(--rule);border-radius:10px;}
+  footer{margin-top:22px;font-size:11px;color:var(--muted);text-align:center;}
+  .note{font-size:11px;color:var(--muted);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="headrow">
+      <div>
+        <div class="kicker">SA SINC · Viral Trend Intelligence</div>
+        <h1>Tren {{ vertical }} — {{ region }}</h1>
+        <div class="sub">Apa yang sedang naik di TikTok, berbasis data.</div>
+      </div>
+      <div class="meta">
+        Kategori: <b>{{ category }}</b><br>
+        Sumber: TikTok Creative Center
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">{{ trends|length }}</div><div class="l">Tren dilacak</div></div>
+    <div class="stat viral"><div class="n">{{ viral_count }}</div><div class="l">Sedang viral</div></div>
+  </div>
+
+  <div class="toolbar">
+    <a class="tab {% if category=='hashtag' %}active{% endif %}" href="/?category=hashtag{% if only_viral %}&only_viral=true{% endif %}">Hashtag</a>
+    <span class="tab off" title="segera">Sound</span>
+    <span class="tab off" title="segera">Video</span>
+    <a class="toggle {% if only_viral %}on{% endif %}" href="/?category={{ category }}{% if not only_viral %}&only_viral=true{% endif %}">
+      {% if only_viral %}✓ {% endif %}Hanya viral
+    </a>
+  </div>
+
+  {% if trends %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Hashtag</th><th class="num">Views</th><th class="num">Posts</th>
+        <th class="num">Velocity/hari</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trends %}
+      <tr>
+        <td class="rank">{{ t.rank or "–" }}</td>
+        <td class="name">
+          <a href="{{ t.url }}" target="_blank" rel="noopener">{{ t.name }}</a>
+          {% if t.is_viral %}<span class="viral">VIRAL</span>{% endif %}
+          <div class="ind">{{ t.industry or "—" }}</div>
+        </td>
+        <td class="num">{{ t.views|compact }}</td>
+        <td class="num">{{ t.video_count|compact }}</td>
+        <td class="num {% if t.velocity %}vel-pos{% else %}vel-na{% endif %}">
+          {% if t.velocity %}+{{ t.velocity|compact }}{% else %}n/a{% endif %}
+        </td>
+        <td><span class="badge b-{{ t.status }}">{{ t.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note">Velocity butuh ≥2 hari data. Status "baru" = data belum cukup buat nilai tren. Data ke-refresh saat pipeline dijalankan.</div>
+  {% else %}
+  <div class="empty">Belum ada data. Jalankan <code>python -m scripts.run_once</code> dulu.</div>
+  {% endif %}
+
+  <footer>SA SINC — Viral Trend Intelligence · MVP · Modul pertama platform SA SINC</footer>
+</div>
+</body>
+</html>

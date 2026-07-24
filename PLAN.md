@@ -119,11 +119,12 @@ viral-trend-mvp/
 - [x] `GET /trends/{id}` → detail + histori snapshot
 - **Done when:** endpoint balikin data asli dari DB. ✅ Diverifikasi via TestClient (sort benar, detail+histori, filter, 404).
 
-### M5 — Dashboard minimal  ⏱️ ~1–2 sesi
-- [ ] Halaman: tabel/kartu top tren F&B (sound/hashtag/video) + indikator naik-turun
-- [ ] Filter kategori (musik / video / editing)
-- [ ] Timing badge (buruan / masih aman)
-- **Done when:** buka di browser, tren update dari DB — **bisa dipamerin ke calon klien**.
+### M5 — Dashboard minimal  ✅ SELESAI
+- [x] Halaman `GET /` (Jinja): tabel top tren + rank/views/posts/velocity
+- [x] Badge status (naik/puncak/turun) + pill **VIRAL**, stat kartu (dilacak / sedang viral)
+- [x] Filter kategori (Hashtag aktif; Sound/Video "segera") + toggle "Hanya viral"
+- **Done when:** buka browser, tren dari DB tampil rapih. ✅ Diverifikasi (screenshot) — **siap dipamerin ke calon klien**.
+- ⏳ Nanti: HTMX live-refresh, halaman detail + grafik histori.
 
 ### M6 — Deteksi gaya editing Level 1  ⏱️ ~1 sesi
 - [ ] `editing.py`: map hashtag/sound → label gaya edit (jedag-jedug, slow-mo, transisi, dll)

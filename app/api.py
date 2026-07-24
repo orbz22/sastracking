@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.config import settings
@@ -16,6 +19,22 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
+templates = Jinja2Templates(directory="app/web/templates")
+
+
+def _compact(n) -> str:
+    """1234 -> 1.2K ; 59400000 -> 59.4M."""
+    if n is None:
+        return "-"
+    n = float(n)
+    for unit, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if abs(n) >= div:
+            return f"{n / div:.1f}{unit}"
+    return str(int(n))
+
+
+templates.env.filters["compact"] = _compact
 
 
 def _row(trend: Trend, snaps: list[Snapshot]) -> dict:
@@ -27,8 +46,35 @@ def _row(trend: Trend, snaps: list[Snapshot]) -> dict:
         "industry": trend.industry,
         "region": trend.region,
         "url": trend.url,
-        **m,  # views, velocity, growth_rate, rank, status, is_viral, ...
+        **m,
     }
+
+
+def _collect(
+    session: Session,
+    category: str,
+    region: str | None,
+    only_viral: bool,
+    limit: int = 200,
+) -> list[dict]:
+    q = select(Trend).where(Trend.category == category)
+    if region:
+        q = q.where(Trend.region == region)
+    rows: list[dict] = []
+    for t in session.exec(q).all():
+        snaps = session.exec(select(Snapshot).where(Snapshot.trend_id == t.id)).all()
+        row = _row(t, snaps)
+        if only_viral and not row["is_viral"]:
+            continue
+        rows.append(row)
+    rows.sort(
+        key=lambda r: (
+            not r["is_viral"],
+            -(r["velocity"] or 0),
+            r["rank"] if r["rank"] is not None else 9999,
+        )
+    )
+    return rows[:limit]
 
 
 @app.get("/health")
@@ -44,27 +90,8 @@ def list_trends(
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_session),
 ):
-    q = select(Trend).where(Trend.category == category)
-    if region:
-        q = q.where(Trend.region == region)
-
-    rows: list[dict] = []
-    for t in session.exec(q).all():
-        snaps = session.exec(select(Snapshot).where(Snapshot.trend_id == t.id)).all()
-        row = _row(t, snaps)
-        if only_viral and not row["is_viral"]:
-            continue
-        rows.append(row)
-
-    # urutan: viral dulu, lalu velocity tertinggi, lalu rank terkecil
-    rows.sort(
-        key=lambda r: (
-            not r["is_viral"],
-            -(r["velocity"] or 0),
-            r["rank"] if r["rank"] is not None else 9999,
-        )
-    )
-    return {"count": len(rows[:limit]), "category": category, "trends": rows[:limit]}
+    rows = _collect(session, category, region, only_viral, limit)
+    return {"count": len(rows), "category": category, "trends": rows}
 
 
 @app.get("/trends/{trend_id}")
@@ -87,3 +114,27 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
         for s in snaps
     ]
     return detail
+
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(
+    request: Request,
+    category: str = "hashtag",
+    only_viral: bool = False,
+    session: Session = Depends(get_session),
+):
+    rows = _collect(session, category, settings.region, only_viral)
+    viral_count = sum(1 for r in rows if r["is_viral"])
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={
+            "app_name": settings.app_name,
+            "region": settings.region,
+            "vertical": settings.vertical.upper(),
+            "category": category,
+            "only_viral": only_viral,
+            "trends": rows,
+            "viral_count": viral_count,
+        },
+    )
