@@ -13,21 +13,14 @@ Password TIDAK lewat kode ini — kamu ketik langsung di halaman TikTok.
 from playwright.sync_api import sync_playwright
 
 from app.config import settings
-from app.scrapers.creative_center import browser_args
+from app.scrapers.creative_center import open_context
 
 LOGIN_URL = "https://ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7"
 
 
 def main() -> None:
     with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(
-            settings.profile_dir,
-            channel="chrome",
-            headless=False,
-            locale="en-US",
-            viewport={"width": 1366, "height": 1000},
-            args=browser_args(),
-        )
+        ctx = open_context(p, headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(LOGIN_URL, wait_until="domcontentloaded")
         print("\n>>> Login di jendela Chrome. Kalau sudah masuk, tekan ENTER di sini...")

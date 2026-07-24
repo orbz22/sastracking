@@ -20,12 +20,31 @@ _NUM_RE = re.compile(r"([\d.]+)\s*([KMB]?)", re.I)
 _MULT = {"": 1, "K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
 
 
+# Sembunyikan sinyal automasi (biar login pihak-ketiga spt Google ga langsung blok).
+STEALTH_JS = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+
+
 def browser_args() -> list[str]:
-    """Args Chrome — pilih profil kalau pakai Chrome asli (multi-profil)."""
-    args: list[str] = []
+    """Args Chrome: anti-deteksi automasi + pilih profil (kalau Chrome asli)."""
+    args = ["--disable-blink-features=AutomationControlled"]
     if settings.profile_subdir:
         args.append(f"--profile-directory={settings.profile_subdir}")
     return args
+
+
+def open_context(p, headless: bool):
+    """Buka persistent context dgn anti-deteksi automasi. Dipakai scraper + login."""
+    ctx = p.chromium.launch_persistent_context(
+        settings.profile_dir,
+        channel="chrome",
+        headless=headless,
+        locale="en-US",
+        viewport={"width": 1366, "height": 1400},
+        args=browser_args(),
+        ignore_default_args=["--enable-automation"],
+    )
+    ctx.add_init_script(STEALTH_JS)
+    return ctx
 
 
 def _num(s: str) -> int | None:
@@ -64,16 +83,9 @@ class CreativeCenterScraper(TrendScraper):
         url = f"{CATEGORY_URL[category]}?region={region}&period={period}"
 
         with sync_playwright() as p:
-            # persistent context = sesi login ke-persist (login sekali via scripts/login.py).
-            # Anon: dapat top 3. Login: 'View more' kebuka -> lebih banyak.
-            ctx = p.chromium.launch_persistent_context(
-                settings.profile_dir,
-                channel="chrome",
-                headless=self.headless,
-                locale="en-US",
-                viewport={"width": 1366, "height": 1400},
-                args=browser_args(),
-            )
+            # persistent context (stealth) = sesi login ke-persist (login sekali via
+            # scripts/login.py). Anon: top 3. Login: 'View more' kebuka -> lebih banyak.
+            ctx = open_context(p, self.headless)
             page = ctx.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60_000)
             try:
