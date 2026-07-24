@@ -20,6 +20,14 @@ _NUM_RE = re.compile(r"([\d.]+)\s*([KMB]?)", re.I)
 _MULT = {"": 1, "K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
 
 
+def browser_args() -> list[str]:
+    """Args Chrome — pilih profil kalau pakai Chrome asli (multi-profil)."""
+    args: list[str] = []
+    if settings.profile_subdir:
+        args.append(f"--profile-directory={settings.profile_subdir}")
+    return args
+
+
 def _num(s: str) -> int | None:
     """'43.1K' -> 43100 ; '59.4M' -> 59400000."""
     if not s:
@@ -64,6 +72,7 @@ class CreativeCenterScraper(TrendScraper):
                 headless=self.headless,
                 locale="en-US",
                 viewport={"width": 1366, "height": 1400},
+                args=browser_args(),
             )
             page = ctx.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60_000)
