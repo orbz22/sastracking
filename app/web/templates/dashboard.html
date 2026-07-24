@@ -48,6 +48,7 @@
   .num{font-variant-numeric:tabular-nums;}
   .vel-pos{color:var(--green);font-weight:600;}
   .vel-na{color:var(--gray);}
+  .win{font-size:11px;font-weight:600;color:var(--muted);background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:2px 8px;}
 
   .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:12px;text-transform:capitalize;}
   .b-naik{background:#e4efe7;color:var(--green);}
@@ -96,7 +97,7 @@
     <thead>
       <tr>
         <th>#</th><th>Hashtag</th><th class="num">Views</th><th class="num">Posts</th>
-        <th class="num">Velocity/hari</th><th>Status</th>
+        <th>Jendela</th><th class="num">Velocity/hari</th><th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -110,6 +111,7 @@
         </td>
         <td class="num">{{ t.views|compact }}</td>
         <td class="num">{{ t.video_count|compact }}</td>
+        <td><span class="win">{{ t.period or "–" }}h</span></td>
         <td class="num {% if t.velocity %}vel-pos{% else %}vel-na{% endif %}">
           {% if t.velocity %}+{{ t.velocity|compact }}{% else %}n/a{% endif %}
         </td>
@@ -118,7 +120,7 @@
       {% endfor %}
     </tbody>
   </table>
-  <div class="note">Velocity butuh ≥2 hari data. Status "baru" = data belum cukup buat nilai tren. Data ke-refresh saat pipeline dijalankan.</div>
+  <div class="note">Kolom <b>Jendela</b> = rentang data sumber (7/30/90 hari); views antar-jendela tidak sebanding — 90 hari bersifat kumulatif. Velocity butuh ≥2 hari data pada jendela yang sama. Status "baru" = data belum cukup. Data ke-refresh saat pipeline dijalankan.</div>
   {% else %}
   <div class="empty">Belum ada data. Jalankan <code>python -m scripts.run_once</code> dulu.</div>
   {% endif %}

@@ -23,6 +23,9 @@ class Snapshot(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     trend_id: int = Field(foreign_key="trend.id", index=True)
     captured_on: date = Field(default_factory=date.today, index=True)
+    # jendela waktu sumber (7/30/90 hari). Views antar-period TIDAK sebanding —
+    # metrik hanya boleh dihitung dari snapshot dengan period yang sama.
+    period: int = Field(default=7, index=True)
     views: int | None = None
     video_count: int | None = None
     engagement_rate: float | None = None

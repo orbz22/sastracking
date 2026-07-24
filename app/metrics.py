@@ -20,8 +20,24 @@ class ViralThresholds:
     down_rate: float = -0.05          # <-5%/hari => turun
 
 
+def series(snaps: list[Snapshot], prefer: tuple[int, ...] = (7, 30, 90)) -> list[Snapshot]:
+    """Ambil satu deret dengan period seragam.
+
+    Views period 7 vs 90 hari tidak sebanding (90 hari bersifat kumulatif), jadi
+    metrik hanya dihitung dari snapshot ber-period sama. Pilih period terpendek
+    yang tersedia — paling responsif terhadap perubahan.
+    """
+    if not snaps:
+        return []
+    available = {getattr(s, "period", 7) for s in snaps}
+    for p in prefer:
+        if p in available:
+            return [s for s in snaps if getattr(s, "period", 7) == p]
+    return snaps
+
+
 def _last_two(snaps: list[Snapshot]) -> tuple[Snapshot | None, Snapshot | None]:
-    s = sorted(snaps, key=lambda x: x.captured_on)
+    s = sorted(series(snaps), key=lambda x: x.captured_on)
     if len(s) < 2:
         return (None, s[-1] if s else None)
     return (s[-2], s[-1])
@@ -55,7 +71,8 @@ def rank_delta(snaps: list[Snapshot]) -> int | None:
 
 def views_per_post(snaps: list[Snapshot]) -> float | None:
     """Proxy jangkauan: views / jumlah video. Bukan engagement true."""
-    last = sorted(snaps, key=lambda x: x.captured_on)[-1] if snaps else None
+    s = series(snaps)
+    last = sorted(s, key=lambda x: x.captured_on)[-1] if s else None
     if last is None or not last.video_count or last.views is None:
         return None
     return last.views / last.video_count
@@ -74,7 +91,8 @@ def status(snaps: list[Snapshot], th: ViralThresholds) -> str:
 
 
 def is_viral(snaps: list[Snapshot], th: ViralThresholds) -> bool:
-    last = sorted(snaps, key=lambda x: x.captured_on)[-1] if snaps else None
+    s = series(snaps)
+    last = sorted(s, key=lambda x: x.captured_on)[-1] if s else None
     if last is None or last.views is None or last.views < th.min_views:
         return False
     v = views_velocity(snaps)
@@ -85,7 +103,8 @@ def is_viral(snaps: list[Snapshot], th: ViralThresholds) -> bool:
 def compute(snaps: list[Snapshot], th: ViralThresholds | None = None) -> dict:
     """Ringkasan semua metrik buat satu trend."""
     th = th or ViralThresholds()
-    last = sorted(snaps, key=lambda x: x.captured_on)[-1] if snaps else None
+    s = series(snaps)
+    last = sorted(s, key=lambda x: x.captured_on)[-1] if s else None
     return {
         "views": last.views if last else None,
         "video_count": last.video_count if last else None,
@@ -96,5 +115,6 @@ def compute(snaps: list[Snapshot], th: ViralThresholds | None = None) -> dict:
         "views_per_post": views_per_post(snaps),
         "status": status(snaps, th),
         "is_viral": is_viral(snaps, th),
-        "history_days": len(snaps),
+        "history_days": len(series(snaps)),
+        "period": getattr(last, "period", None) if last else None,
     }

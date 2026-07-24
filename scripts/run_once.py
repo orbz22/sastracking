@@ -16,7 +16,7 @@ from app.pipeline import run_pipeline
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
 
-    result = run_pipeline(categories=("hashtag",), period=7, region="ID")
+    result = run_pipeline(categories=("hashtag",), periods=(7, 30, 90), region="ID")
     print(f"Pipeline: +{result['new_trends']} trend baru, {result['snapshots']} snapshot.\n")
 
     with Session(engine) as s:
