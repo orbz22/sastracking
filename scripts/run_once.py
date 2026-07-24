@@ -8,6 +8,7 @@ import sys
 from sqlmodel import Session, func, select
 
 from app.db import engine
+from app.metrics import compute
 from app.models import Snapshot, Trend
 from app.pipeline import run_pipeline
 
@@ -23,17 +24,14 @@ def main() -> None:
         total_snap = s.exec(select(func.count()).select_from(Snapshot)).one()
         print(f"DB: {len(trends)} trend, {total_snap} snapshot total.\n")
         for t in trends:
-            n = s.exec(
-                select(func.count()).select_from(Snapshot).where(Snapshot.trend_id == t.id)
-            ).one()
-            last = s.exec(
-                select(Snapshot)
-                .where(Snapshot.trend_id == t.id)
-                .order_by(Snapshot.captured_on.desc())
-            ).first()
+            snaps = s.exec(select(Snapshot).where(Snapshot.trend_id == t.id)).all()
+            m = compute(snaps)
+            vel = f"{m['velocity']:,.0f}/hari" if m["velocity"] is not None else "n/a"
+            flag = "VIRAL" if m["is_viral"] else "-"
             print(
                 f"  {t.name:<24} {t.industry or '-':<22} "
-                f"histori={n} snapshot | terakhir rank={last.rank} views={last.views:,}"
+                f"[{m['status']:<6} {flag:<5}] views={m['views']:,} velocity={vel} "
+                f"hist={m['history_days']}d"
             )
 
 

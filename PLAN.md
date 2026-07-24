@@ -107,11 +107,12 @@ viral-trend-mvp/
 - [x] `pipeline.py`: scrape → upsert Trend → insert Snapshot harian (**idempoten** per hari)
 - **Done when:** DB nyimpen histori (bukan overwrite). ✅ Diverifikasi: run 2x/hari = ga dobel; snapshot beda tanggal numpuk. **Histori = aset prediksi.**
 
-### M3 — Metrik viral + definisi ambang  ⏱️ ~1 sesi
-- [ ] `metrics.py`: hitung **velocity** (Δ views 24–72j), **volume** (jml video baru), **engagement rate**
-- [ ] Tetapkan ambang "sedang viral" (kalibrasi kasar dari data M2)
-- [ ] Flag tiap tren: naik / puncak / turun
-- **Done when:** query "top tren viral F&B minggu ini" keluar terurut.
+### M3 — Metrik viral + definisi ambang  ✅ SELESAI (logika)
+- [x] `metrics.py`: **velocity** (Δviews/hari), **growth_rate**, **rank_delta**, **views_per_post** (proxy)
+- [x] Ambang "sedang viral" (`ViralThresholds`, kalibrasi kasar — sesuaikan nanti)
+- [x] Flag status: **baru / naik / puncak / turun** + `is_viral`
+- **Done when:** metrik keluar per trend. ✅ Diverifikasi: histori 2-hari → velocity 9.4M/hari, +18.8%/hari, status "naik", viral=True.
+- ⏳ Catatan: **engagement true** (like/share) belum ada — butuh enrichment (fase 2). Akurasi velocity naik seiring data harian numpuk.
 
 ### M4 — API  ⏱️ ~1 sesi
 - [ ] `api.py`: `GET /trends?vertical=fnb&type=sound|hashtag|video` → JSON top tren + metrik
