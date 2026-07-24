@@ -85,13 +85,21 @@ viral-trend-mvp/
 - [x] `.env.example` + `app/config.py`
 - **Done when:** `uvicorn app.api:app` nyala walau kosong. ✅ `/health`=200, DB `trends.db` kebentuk otomatis.
 
-### M1 — Scraper spike: Creative Center (BUKTIKAN DATA BISA DIAMBIL)  ⏱️ ~1–2 sesi
-- [ ] Pelajari struktur endpoint JSON Creative Center (ref repo `lofe-w/...` — **pahami**, jangan copy buta)
-- [ ] `scrapers/base.py`: interface `fetch_trends(vertical, category) -> list[dict]`
-- [ ] `scrapers/creative_center.py`: ambil trending **sound + hashtag** region **Indonesia**, filter F&B, via `httpx`
-- [ ] `scripts/run_once.py`: print hasil ke terminal
-- **Done when:** terminal nampilin ≥10 tren F&B nyata dari Creative Center. ⚠️ Gerbang paling penting — kalau ga bisa, semua berhenti di sini.
-- **Kalau kena blok:** naik ke fallback Playwright → Apify (lihat §1b). Jangan langsung scrape app konsumen.
+### M1 — Scraper spike: Creative Center  ✅ MEKANISME PROVEN (sebagian)
+- [x] `scrapers/base.py`: interface `fetch_trends(...) -> list[dict]`
+- [x] `scrapers/creative_center.py` + `scripts/run_once.py`: narik tren hashtag ID nyata (posts/views)
+- [ ] Filter industri **F&B** (skrg default "All" — perlu param/dropdown industry_id)
+- [ ] Login (akun TikTok Business) buka "View more" → ≥10–100 baris (anon cap 3)
+- [ ] Tambah kategori: trending **sound** + **video** (halaman terpisah)
+- **Done when:** ≥10 tren **F&B** nyata. **Status:** data extraction TERBUKTI jalan; sisa = filter F&B + login buat volume.
+
+**Temuan riset lapangan (penting):**
+- Creative Center rebrand → **"TikTok One Creative Suite"**, URL tren: `ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7`
+- `httpx` langsung ke JSON API → **`40101 no permission`** (butuh signature JS). Buntu.
+- Data **tidak** di HTML awal & **tidak** via XHR JSON → **dirender ke DOM** (SSR + hydrate).
+- **Solusi: scrape DOM via Playwright** (parse innerText tabel). `headless=True` **DIBLOK** → wajib **headed**.
+- Anon = **top 3**/kategori; login = lebih banyak.
+- Konsekuensi: scheduler harian (M7) harus jalan **headed** (Task Scheduler di mesin, bukan headless server).
 
 ### M2 — Database + simpan harian  ⏱️ ~1 sesi
 - [ ] `models.py`: `Trend` (id, tipe, nama, sound_url, dll) + `Snapshot` (trend_id, tanggal, views, jml_video, engagement)
