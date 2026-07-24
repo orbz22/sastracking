@@ -17,13 +17,22 @@ cp .env.example .env
 
 ## Jalanin
 
-```bash
-# API + health check
-uvicorn app.api:app --reload
-# buka http://127.0.0.1:8000/health  dan  /docs
+> PENTING: pakai Python dari **.venv** (bukan Python global). Cara paling aman —
+> tunjuk python venv langsung, jadi ga perlu aktivasi & ga kena execution-policy:
 
-# Pipeline manual sekali (M1+)
-python -m scripts.run_once
+```powershell
+# Dashboard + API  ->  http://127.0.0.1:8000/  (dan /docs, /health)
+.venv\Scripts\python.exe -m uvicorn app.api:app --reload
+
+# Pipeline manual sekali (scrape -> DB)  — buka jendela Chrome (headed)
+.venv\Scripts\python.exe -m scripts.run_once
+```
+
+Kalau mau aktivasi venv dulu (biar bisa ketik `uvicorn`/`python` langsung):
+
+```powershell
+.venv\Scripts\Activate.ps1      # kalau ditolak: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+uvicorn app.api:app --reload
 ```
 
 ## Status
