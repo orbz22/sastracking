@@ -10,6 +10,7 @@ class Trend(SQLModel, table=True):
     external_id: str = Field(index=True)          # id dari sumber (Creative Center)
     category: str                                  # "sound" | "hashtag" | "video"
     name: str
+    industry: str | None = None                    # mis. "Games", "News & Entertainment"
     url: str | None = None
     region: str = "ID"
     vertical: str = "fnb"

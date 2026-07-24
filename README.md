@@ -29,8 +29,8 @@ python -m scripts.run_once
 ## Status
 
 - [x] M0 — Setup proyek (skeleton + API nyala)
-- [ ] M1 — Scraper Creative Center
-- [ ] M2 — DB + histori harian
+- [x] M1 — Scraper Creative Center (DOM/Playwright, headed) — data nyata
+- [x] M2 — DB + histori harian (idempoten, histori kebukti)
 - [ ] M3 — Metrik viral
 - [ ] M4 — API top-tren
 - [ ] M5 — Dashboard

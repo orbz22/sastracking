@@ -101,11 +101,11 @@ viral-trend-mvp/
 - Anon = **top 3**/kategori; login = lebih banyak.
 - Konsekuensi: scheduler harian (M7) harus jalan **headed** (Task Scheduler di mesin, bukan headless server).
 
-### M2 — Database + simpan harian  ⏱️ ~1 sesi
-- [ ] `models.py`: `Trend` (id, tipe, nama, sound_url, dll) + `Snapshot` (trend_id, tanggal, views, jml_video, engagement)
-- [ ] `db.py`: init SQLite + create tables
-- [ ] `pipeline.py`: scrape → upsert Trend → insert Snapshot harian
-- **Done when:** jalanin 2 hari, DB nyimpen histori (bukan cuma overwrite). **Histori = aset prediksi.**
+### M2 — Database + simpan harian  ✅ SELESAI
+- [x] `models.py`: `Trend` (+ industry) + `Snapshot` (trend_id, tanggal, views, video_count, rank)
+- [x] `db.py`: init SQLite + create tables
+- [x] `pipeline.py`: scrape → upsert Trend → insert Snapshot harian (**idempoten** per hari)
+- **Done when:** DB nyimpen histori (bukan overwrite). ✅ Diverifikasi: run 2x/hari = ga dobel; snapshot beda tanggal numpuk. **Histori = aset prediksi.**
 
 ### M3 — Metrik viral + definisi ambang  ⏱️ ~1 sesi
 - [ ] `metrics.py`: hitung **velocity** (Δ views 24–72j), **volume** (jml video baru), **engagement rate**

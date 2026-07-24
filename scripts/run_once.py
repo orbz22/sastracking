@@ -1,25 +1,40 @@
-"""Jalanin scraper manual sekali. Spike M1.
+"""Jalanin pipeline sekali (scrape -> simpan) lalu tampilkan isi DB.
 
 Usage:  python -m scripts.run_once
 """
 
 import sys
 
-from app.scrapers.creative_center import CreativeCenterScraper
+from sqlmodel import Session, func, select
+
+from app.db import engine
+from app.models import Snapshot, Trend
+from app.pipeline import run_pipeline
 
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
-    scraper = CreativeCenterScraper()  # headed (headless diblok TikTok)
-    trends = scraper.fetch_trends(category="hashtag", period=7, region="ID")
-    print(f"Dapat {len(trends)} tren hashtag F&B/ID:\n")
-    for x in trends:
-        print(
-            f"  #{x['rank']:>2} {x['name']:<24} {x['industry']:<24} "
-            f"posts={x['posts']:,} views={x['views']:,}"
-        )
-    if not trends:
-        print("  (kosong — cek koneksi / TikTok ubah struktur DOM)")
+
+    result = run_pipeline(categories=("hashtag",), period=7, region="ID")
+    print(f"Pipeline: +{result['new_trends']} trend baru, {result['snapshots']} snapshot.\n")
+
+    with Session(engine) as s:
+        trends = s.exec(select(Trend)).all()
+        total_snap = s.exec(select(func.count()).select_from(Snapshot)).one()
+        print(f"DB: {len(trends)} trend, {total_snap} snapshot total.\n")
+        for t in trends:
+            n = s.exec(
+                select(func.count()).select_from(Snapshot).where(Snapshot.trend_id == t.id)
+            ).one()
+            last = s.exec(
+                select(Snapshot)
+                .where(Snapshot.trend_id == t.id)
+                .order_by(Snapshot.captured_on.desc())
+            ).first()
+            print(
+                f"  {t.name:<24} {t.industry or '-':<22} "
+                f"histori={n} snapshot | terakhir rank={last.rank} views={last.views:,}"
+            )
 
 
 if __name__ == "__main__":
