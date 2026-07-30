@@ -45,7 +45,7 @@ Gerbang M1 = hidup-mati produk. Riset 2026: **jangan scrape app TikTok konsumen 
 ## 2. Struktur Folder (target)
 
 ```
-viral-trend-mvp/
+sastracking/
 ├── PLAN.md                  # dokumen ini
 ├── README.md               # cara jalanin
 ├── .env.example            # template config
