@@ -89,9 +89,9 @@ sastracking/
 - [x] `scrapers/base.py`: interface `fetch_trends(...) -> list[dict]`
 - [x] `scrapers/creative_center.py` + `scripts/run_once.py`: narik tren hashtag ID nyata (posts/views)
 - [x] **Filter industri F&B** — via klik UI dropdown (`_select_industry`), parser tahan multi-tag industri
-- [~] **Login** (persistent profile) — scaffold siap: `scripts/login.py` (login manual sekali) + `_load_more` (klik "View more"). **Butuh user login sekali** buat buka >3 baris.
+- [x] **Login** (persistent profile) — `scripts/login.py`, dijalankan 2026-08-02. Sesi di `.pw-profile/`.
 - [ ] Tambah kategori: trending **sound** + **video** (halaman terpisah)
-- **Status:** F&B data nyata tampil di dashboard (3 baris anon). Login → 20–100 baris.
+- **Status:** F&B data nyata tampil di dashboard. **Anon 3–4 baris → login 100 baris per kombinasi.**
 - ⚠️ `headless=True` diblok → **headed**. Scraper pakai **persistent context** (`.pw-profile/`, gitignore).
 
 **Cakupan tanpa login (hasil riset lanjutan):**
@@ -103,6 +103,30 @@ sastracking/
   - Klik "View more" tanpa login memunculkan **modal login** yang memblokir dropdown → modal ditutup otomatis (Escape) lalu berhenti.
   - Setelah scroll, dropdown industri keluar viewport → `scroll_into_view` sebelum klik.
 - Opsi berbayar tanpa login TikTok (kalau mau lepas dari scrape lokal): Apify `doliz` Creative Center, EnsembleData, TickerTrends.
+
+**Setelah login — mekanisme halaman BERUBAH (diukur 2026-08-02):**
+- Tombol **"View more" hilang total** saat login. Halaman ganti jadi **infinite scroll**
+  dengan list **ter-virtualisasi**: baris yang lewat viewport di-unmount dari DOM
+  (terbukti: jumlah baris naik 9 → 20 lalu **turun** ke 10 saat terus di-scroll).
+  → `inner_text()` sekali di akhir hanya menangkap yang sedang terlihat.
+  → `_load_more()` (klik tombol) diganti `_scroll_collect()`: **parsing tiap ronde
+     scroll**, dedup per `external_id`, berhenti setelah 6 ronde tanpa baris baru.
+- Hasil per kombinasi: **100 baris / ~30 detik** (naik dari 3–4 baris anon).
+  100 tampaknya plafon dari sumber, bukan batas scroll.
+- **Filter industri tetap wajib.** Sapuan tanpa filter juga 100 baris, tapi hanya
+  4 yang F&B; sapuan ber-filter F&B menghasilkan 100 baris yang **96 di antaranya
+  tidak muncul** di daftar global. Vertikal F&B ≠ subset dari top global.
+- Estimasi refresh penuh: 3 periode × 6 industri × ~30 dtk ≈ **9–10 menit**
+  (sebelumnya ~3 menit), potensi ~1.800 baris/hari.
+- Konsekuensi lain yang sudah ditangani:
+  - Dashboard tadinya query snapshot **per tren** (N+1) — aman di 79 tren, berat
+    di ribuan → diganti satu query `IN (...)` lalu dikelompokkan di Python.
+  - `scroll_max_rounds` jadi setting (default 40) buat ngerem kalau kelamaan.
+- ⚠️ **Ambang viral jadi tidak berarti.** Distribusi 100 baris F&B (7 hari, 2026-08-02):
+  median 3,5 jt views, p90 29 jt, max 1,6 M views. Ambang `min_views=1 jt` meloloskan
+  **96 dari 100**. Waktu datanya cuma 3 baris teratas ini nggak kelihatan karena
+  ketiganya memang viral. **Perlu rekalibrasi** — lihat M2 (belum diputuskan:
+  naikkan ambang absolut vs ganti ke basis persentil per kohort).
 
 **Temuan riset lapangan (penting):**
 - Creative Center rebrand → **"TikTok One Creative Suite"**, URL tren: `ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7`

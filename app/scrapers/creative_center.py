@@ -71,8 +71,14 @@ def _num(s: str) -> int | None:
 class CreativeCenterScraper(TrendScraper):
     """UTAMA (§1b): scrape tren dari Creative Center via DOM (Playwright).
 
-    Tanpa login: dapat top ~3 per kategori. Login (akun TikTok Business) =
-    'View more' kebuka -> top 20/100. Login belum dipasang (fase berikut).
+    Tanpa login: ~3 baris per kombinasi, dibatasi modal "Log in or sign up".
+    Sudah login (lihat scripts/login.py): tombol "View more" HILANG — halaman
+    ganti jadi infinite scroll dengan list ter-virtualisasi, dan berhenti di
+    ~100 baris per kombinasi. Diukur 2026-08-02: 100 baris / ~27 detik.
+
+    Konsekuensi virtualisasi: baris yang sudah dilewati di-unmount dari DOM,
+    jadi inner_text() sekali di akhir cuma nangkap yang lagi kelihatan.
+    Makanya parsing dilakukan SAMBIL scroll, bukan sesudahnya.
     """
 
     # headless=True DIBLOK TikTok (ERR_HTTP_RESPONSE_CODE_FAILURE) -> default headed.
@@ -108,39 +114,54 @@ class CreativeCenterScraper(TrendScraper):
             page.wait_for_timeout(3_000)
             if industry:
                 self._select_industry(page, industry)
-            self._load_more(page)
-            text = page.inner_text("body")
+            rows = self._scroll_collect(page, region, period, industry)
             ctx.close()
 
-        return self._parse_hashtags(text, region, period, industry)
+        return rows
 
-    @staticmethod
-    def _load_more(page, max_clicks: int = 15) -> None:
-        """Klik 'View more' berulang (kalau login) sampai baris berhenti nambah.
+    def _scroll_collect(
+        self,
+        page,
+        region: str,
+        period: int,
+        industry: str | None,
+        max_rounds: int | None = None,
+        stale_limit: int = 6,
+    ) -> list[dict]:
+        """Scroll pelan sambil parsing tiap ronde, dedup per external_id.
 
-        Tanpa login, klik ini memunculkan modal 'Log in or sign up' yang menutupi
-        halaman dan bikin interaksi berikutnya (dropdown industri) gagal — jadi
-        modal langsung ditutup lalu berhenti.
+        List-nya ter-virtualisasi: baris yang lewat viewport dihapus dari DOM.
+        Jadi bukan "scroll sampai habis lalu baca", tapi "baca tiap ronde".
+        Berhenti kalau `stale_limit` ronde berturut-turut nggak nambah baris
+        baru (bukan sekali gagal — pemuatan kadang telat satu ronde).
         """
-        for _ in range(max_clicks):
-            before = page.locator("text=See analytics").count()
-            vm = page.get_by_text("View more", exact=True)
-            if vm.count() == 0:
-                break
-            try:
-                vm.first.scroll_into_view_if_needed(timeout=3_000)
-                vm.first.click(timeout=4_000)
-            except Exception:
-                break
-            page.wait_for_timeout(2_000)
+        max_rounds = max_rounds or settings.scroll_max_rounds
+        seen: dict[str, dict] = {}
 
-            # dinding login (anon) -> tutup modal, hentikan
+        def grab() -> None:
+            for r in self._parse_hashtags(
+                page.inner_text("body"), region, period, industry
+            ):
+                seen.setdefault(r["external_id"], r)
+
+        stale = 0
+        for _ in range(max_rounds):
+            grab()
+            before = len(seen)
+            page.mouse.wheel(0, 2_200)
+            page.wait_for_timeout(1_400)
+            grab()
+
+            # dinding login (anon / sesi habis) -> tutup modal, hentikan
             if page.locator("[role='dialog'], .byted-modal, .login-modal").count():
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(600)
                 break
-            if page.locator("text=See analytics").count() <= before:
-                break  # ga nambah -> stop
+
+            stale = 0 if len(seen) > before else stale + 1
+            if stale >= stale_limit:
+                break
+        return list(seen.values())
 
     def fetch_many(
         self,
@@ -174,10 +195,7 @@ class CreativeCenterScraper(TrendScraper):
                 page.wait_for_timeout(2_500)
                 for industry in industries:
                     self._select_industry(page, industry)
-                    self._load_more(page)
-                    rows = self._parse_hashtags(
-                        page.inner_text("body"), region, period, industry
-                    )
+                    rows = self._scroll_collect(page, region, period, industry)
                     for r in rows:
                         seen.setdefault((r["external_id"], period), r)
                     print(
@@ -191,10 +209,12 @@ class CreativeCenterScraper(TrendScraper):
     def _select_industry(page, industry: str) -> None:
         """Buka dropdown industri (.cc-select pertama) lalu pilih label industri.
 
-        Wajib scroll balik ke atas dulu: setelah _load_more halaman ter-scroll ke
-        bawah dan dropdown keluar viewport sehingga klik timeout.
+        Wajib balik ke atas dulu: setelah _scroll_collect halaman ada di dasar
+        dan dropdown keluar viewport sehingga klik timeout.
         """
         try:
+            page.evaluate("window.scrollTo(0, 0)")
+            page.wait_for_timeout(800)
             # tutup modal/dropdown sisa dari langkah sebelumnya
             if page.locator("[role='dialog'], .byted-modal").count():
                 page.keyboard.press("Escape")

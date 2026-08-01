@@ -23,10 +23,31 @@ def main() -> None:
         ctx = open_context(p, headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(LOGIN_URL, wait_until="domcontentloaded")
-        print("\n>>> Login di jendela Chrome. Kalau sudah masuk, tekan ENTER di sini...")
+        print("\n>>> Login di jendela Chrome (JANGAN pakai 'Continue with Google').")
+        print(">>> Kalau habis login kena 404, biarin saja — tekan ENTER di sini...")
         input()
+
+        # Habis login TikTok sering redirect ke path lama (404). Balikin sendiri ke
+        # URL yang benar, lalu cek beneran login atau nggak — jangan cuma nebak.
+        try:
+            page.goto(LOGIN_URL, wait_until="domcontentloaded")
+            page.wait_for_timeout(4_000)
+            rows = page.locator("text=See analytics").count()
+            anon = page.get_by_text("Log in", exact=True).count() > 0
+        except Exception as exc:  # noqa: BLE001
+            rows, anon = 0, True
+            print("Gagal cek halaman:", exc)
+
         ctx.close()
-        print("Sesi tersimpan di", settings.profile_dir, "- scraper berikutnya otomatis login.")
+
+        if anon or rows == 0:
+            print("\n[BELUM LOGIN] Halaman masih nampilin tombol 'Log in'"
+                  f" (baris tren kebaca: {rows}).")
+            print("Coba lagi: .venv\\Scripts\\python.exe -m scripts.login")
+        else:
+            print(f"\n[OK] Login kebaca — {rows} baris tren kelihatan tanpa modal.")
+            print("Sesi tersimpan di", settings.profile_dir,
+                  "- scraper berikutnya otomatis login.")
 
 
 if __name__ == "__main__":

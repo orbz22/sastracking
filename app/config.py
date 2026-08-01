@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # profile_subdir ke folder profilnya (mis. "Default" / "Profile 1").
     profile_dir: str = ".pw-profile"
     profile_subdir: str = ""  # kosong = pakai profile_dir apa adanya
+    # Batas ronde scroll per kombinasi. Sudah login, TikTok mentok ~100 baris
+    # (~12 ronde). 40 = ruang aman; turunin kalau refresh kelamaan.
+    scroll_max_rounds: int = 40
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"

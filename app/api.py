@@ -82,17 +82,26 @@ def _collect(
         q = q.where(Trend.region == region)
     if industry:
         q = q.where(Trend.industry == industry)
-    rows: list[dict] = []
-    for t in session.exec(q).all():
-        snaps = list(
-            session.exec(select(Snapshot).where(Snapshot.trend_id == t.id)).all()
-        )
+    trends = list(session.exec(q).all())
+
+    # satu query buat semua snapshot lalu dikelompokkan di Python. Sebelumnya
+    # satu query per tren (N+1) — ga kerasa di 79 tren, berat di ribuan.
+    by_trend: dict[int, list[Snapshot]] = {}
+    if trends:
+        ids = [t.id for t in trends]
+        sq = select(Snapshot).where(Snapshot.trend_id.in_(ids))
         if period:
-            # jendela dikunci: tren tanpa snapshot di period itu ikut hilang,
-            # bukan jatuh ke period lain (views antar-period nggak sebanding)
-            snaps = [s for s in snaps if s.period == period]
-            if not snaps:
-                continue
+            sq = sq.where(Snapshot.period == period)
+        for s in session.exec(sq).all():
+            by_trend.setdefault(s.trend_id, []).append(s)
+
+    rows: list[dict] = []
+    for t in trends:
+        snaps = by_trend.get(t.id, [])
+        # jendela dikunci di query di atas: tren tanpa snapshot di period itu
+        # ikut hilang, bukan jatuh ke period lain (views antar-period nggak sebanding)
+        if period and not snaps:
+            continue
         row = _row(t, snaps)
         if only_viral and not row["is_viral"]:
             continue
