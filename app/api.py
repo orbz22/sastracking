@@ -12,6 +12,7 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.metrics import compute, mark_viral
 from app.models import Snapshot, Trend
+from app.scrapers.registry import DEFAULT_PLATFORM, PLATFORMS, get_platform
 
 
 @asynccontextmanager
@@ -76,8 +77,11 @@ def _collect(
     limit: int = 200,
     industry: str | None = None,
     period: int | None = None,
+    platform: str = DEFAULT_PLATFORM,
 ) -> list[dict]:
-    q = select(Trend).where(Trend.category == category)
+    q = select(Trend).where(
+        Trend.platform == platform, Trend.category == category
+    )
     if region:
         q = q.where(Trend.region == region)
     if industry:
@@ -132,11 +136,36 @@ def list_trends(
     industry: str | None = None,
     only_viral: bool = False,
     period: int | None = Query(None, description="jendela sumber: 7 / 30 / 90 hari"),
+    platform: str = Query(DEFAULT_PLATFORM, description="tiktok | instagram | youtube"),
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_session),
 ):
-    rows = _collect(session, category, region, only_viral, limit, industry, period)
-    return {"count": len(rows), "category": category, "period": period, "trends": rows}
+    rows = _collect(
+        session, category, region, only_viral, limit, industry, period, platform
+    )
+    return {
+        "count": len(rows),
+        "platform": platform,
+        "category": category,
+        "period": period,
+        "trends": rows,
+    }
+
+
+@app.get("/platforms")
+def list_platforms():
+    """Platform yang terdaftar + status ketersediaan scraper-nya."""
+    return [
+        {
+            "key": p.key,
+            "label": p.label,
+            "available": p.available,
+            "categories": list(p.categories),
+            "industries": len(p.industries),
+            "note": p.note,
+        }
+        for p in PLATFORMS.values()
+    ]
 
 
 @app.get("/trends/{trend_id}")
@@ -162,16 +191,17 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
 
 
 @app.post("/refresh")
-def refresh(quick: bool = False):
+def refresh(quick: bool = False, platform: str = DEFAULT_PLATFORM):
     """Mulai ambil data baru di background lalu balik ke dashboard.
 
     quick=True: hanya F&B periode 7 hari (~30 detik) buat cek cepat.
+    Penuh: semua industri × 3 periode — puluhan menit, lihat catatan di M7.
     """
-    kwargs = (
-        {"periods": (7,), "industries": ("Food & Beverage",)} if quick else {}
-    )
+    kwargs: dict = {"platform": platform}
+    if quick:
+        kwargs |= {"periods": (7,), "industries": ("Food & Beverage",)}
     jobs.start_refresh(**kwargs)  # kalau sudah jalan, diabaikan
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(f"/?platform={platform}", status_code=303)
 
 
 @app.get("/refresh/status")
@@ -187,8 +217,11 @@ def dashboard(
     only_viral: bool = False,
     period: int | None = Query(None, description="jendela sumber: 7 / 30 / 90 hari"),
     metric: str = Query("views", pattern="^(views|velocity)$"),
+    platform: str = DEFAULT_PLATFORM,
     session: Session = Depends(get_session),
 ):
+    plat = get_platform(platform)
+    category = category if category in plat.categories else plat.categories[0]
     rows = _collect(
         session,
         category,
@@ -196,25 +229,39 @@ def dashboard(
         only_viral,
         industry=industry,
         period=period,
+        platform=plat.key,
     )
     viral_count = sum(1 for r in rows if r["is_viral"])
     rising = sum(1 for r in rows if r["status"] == "naik")
     total_views = sum(r["views"] or 0 for r in rows)
 
-    # deret harian buat sparkline kartu KPI (butuh >=2 hari data)
+    # Deret harian buat sparkline KPI (butuh >=2 hari data). WAJIB dikunci ke
+    # satu jendela: kalau dicampur, hari yang kebetulan punya snapshot 90-hari
+    # (kumulatif) bikin totalnya melonjak dan delta%-nya jadi omong kosong.
+    spark_period = period or 7
     ids = [r["id"] for r in rows]
     snaps = (
-        list(session.exec(select(Snapshot).where(Snapshot.trend_id.in_(ids))).all())
+        list(
+            session.exec(
+                select(Snapshot).where(
+                    Snapshot.trend_id.in_(ids), Snapshot.period == spark_period
+                )
+            ).all()
+        )
         if ids
         else []
     )
-    if period:
-        snaps = [s for s in snaps if s.period == period]
     daily = charts.daily_totals(snaps)
 
-    # daftar industri yang tersedia (buat tombol filter)
+    # industri yang benar-benar ada datanya di platform ini (buat tombol filter)
     industries = sorted(
-        {t.industry for t in session.exec(select(Trend)).all() if t.industry}
+        {
+            t.industry
+            for t in session.exec(
+                select(Trend).where(Trend.platform == plat.key)
+            ).all()
+            if t.industry
+        }
     )
     state = {
         "category": category,
@@ -222,6 +269,7 @@ def dashboard(
         "only_viral": only_viral,
         "period": period,
         "metric": metric,
+        "platform": plat.key if plat.key != DEFAULT_PLATFORM else None,
     }
     return templates.TemplateResponse(
         request=request,
@@ -229,7 +277,8 @@ def dashboard(
         context={
             "app_name": settings.app_name,
             "region": settings.region,
-            "vertical": settings.vertical.upper(),
+            "platform": plat,
+            "platforms": list(PLATFORMS.values()),
             "category": category,
             "only_viral": only_viral,
             "trends": rows,
@@ -248,6 +297,7 @@ def dashboard(
             "spark_views": charts.sparkline([d[1] for d in daily]),
             "spark_trends": charts.sparkline([float(d[2]) for d in daily]),
             "days": len(daily),
+            "spark_period": spark_period,
             "last_day": daily[-1][0].isoformat() if daily else None,
         },
     )

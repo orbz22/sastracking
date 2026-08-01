@@ -7,13 +7,18 @@ class Trend(SQLModel, table=True):
     """Satu tren unik (sound / hashtag / video) yang dilacak."""
 
     id: int | None = Field(default=None, primary_key=True)
+    # sumber tren: "tiktok" | "instagram" | "youtube" (lihat scrapers/registry.py).
+    # external_id hanya unik DI DALAM satu platform -> pencarian selalu ikut platform.
+    platform: str = Field(default="tiktok", index=True)
     external_id: str = Field(index=True)          # id dari sumber (Creative Center)
     category: str                                  # "sound" | "hashtag" | "video"
     name: str
     industry: str | None = None                    # mis. "Games", "News & Entertainment"
     url: str | None = None
     region: str = "ID"
-    vertical: str = "fnb"
+    # peninggalan waktu produk masih dikunci di satu vertikal (F&B). Sekarang
+    # cakupannya semua industri, jadi industry yang dipakai buat segmentasi.
+    vertical: str | None = None
     first_seen: datetime = Field(default_factory=datetime.utcnow)
 
 

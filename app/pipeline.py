@@ -3,11 +3,13 @@
 Idempoten per (trend, tanggal, period): jalanin 2x di hari sama = update, bukan duplikat.
 Kumpulan Snapshot lintas hari = histori (aset prediksi).
 
-Tanpa login, Creative Center hanya menampilkan ~3 baris per kombinasi filter.
-Karena itu pipeline menyapu banyak kombinasi (periode 7/30/90 × beberapa industri
-yang bersinggungan dgn F&B) — cara sah menambah cakupan tanpa menembus login.
-Views antar-period TIDAK sebanding (7 hari vs 90 hari kumulatif), jadi period
-ikut disimpan di tiap snapshot dan metrik hanya membandingkan period yang sama.
+Pipeline tidak menyebut TikTok sama sekali — platform diambil dari
+scrapers/registry.py, jadi menambah Instagram/YouTube nanti tidak menyentuh file
+ini. Default cakupan: SEMUA industri (bukan lagi khusus F&B).
+
+Satu kombinasi filter = 100 baris (sudah login). Views antar-period TIDAK
+sebanding (7 hari vs 90 hari kumulatif), jadi period ikut disimpan di tiap
+snapshot dan metrik hanya membandingkan period yang sama.
 """
 
 from datetime import date
@@ -16,17 +18,21 @@ from sqlmodel import Session, select
 
 from app.db import engine, init_db
 from app.models import Snapshot, Trend
-from app.scrapers.creative_center import FNB_ADJACENT, CreativeCenterScraper
+from app.scrapers.registry import DEFAULT_PLATFORM, get_platform, get_scraper
 
 
 def run_pipeline(
-    categories: tuple[str, ...] = ("hashtag",),
+    categories: tuple[str, ...] | None = None,
     periods: tuple[int, ...] = (7, 30, 90),
-    industries: tuple[str, ...] = FNB_ADJACENT,
+    industries: tuple[str, ...] | None = None,
     region: str | None = None,
+    platform: str = DEFAULT_PLATFORM,
 ) -> dict:
     init_db()
-    scraper = CreativeCenterScraper()
+    plat = get_platform(platform)
+    scraper = get_scraper(platform)
+    categories = categories or plat.categories
+    industries = industries or plat.industries
     new_trends = 0
     snaps = 0
     today = date.today()
@@ -42,6 +48,7 @@ def run_pipeline(
             for it in items:
                 trend = s.exec(
                     select(Trend).where(
+                        Trend.platform == plat.key,
                         Trend.external_id == it["external_id"],
                         Trend.category == it["category"],
                         Trend.region == it["region"],
@@ -49,13 +56,13 @@ def run_pipeline(
                 ).first()
                 if trend is None:
                     trend = Trend(
+                        platform=plat.key,
                         external_id=it["external_id"],
                         category=it["category"],
                         name=it["name"],
                         industry=it.get("industry"),
                         url=it.get("url"),
                         region=it["region"],
-                        vertical="fnb",
                     )
                     s.add(trend)
                     s.commit()
@@ -81,7 +88,7 @@ def run_pipeline(
                 s.commit()
                 snaps += 1
 
-    return {"new_trends": new_trends, "snapshots": snaps}
+    return {"new_trends": new_trends, "snapshots": snaps, "platform": plat.key}
 
 
 if __name__ == "__main__":

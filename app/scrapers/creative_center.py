@@ -16,8 +16,28 @@ INDUSTRY_LABEL = {
     "fnb": "Food & Beverage",
 }
 
-# Tanpa login tiap kombinasi filter cuma kasih ~3 baris. Sapu beberapa industri
-# yang bersinggungan dgn F&B buat naikin cakupan (tetap data publik, bukan bypass).
+# Seluruh industri yang bisa dipilih di dropdown Creative Center
+# (dibaca langsung dari halaman 2026-08-02, opsi "All" tidak dihitung).
+ALL_INDUSTRIES = (
+    "Food & Beverage",
+    "Beauty & Personal Care",
+    "Apparel & Accessories",
+    "News & Entertainment",
+    "Games",
+    "Sports & Outdoor",
+    "Health",
+    "Travel",
+    "Education",
+    "Tech & Electronics",
+    "Vehicle & Transportation",
+    "Baby, Kids & Maternity",
+    "Household Products",
+    "Home Improvement",
+    "Pets",
+)
+
+# Subset lama waktu produk masih dikunci di vertikal F&B. Dipertahankan buat
+# sapuan cepat/hemat waktu, bukan lagi default.
 FNB_ADJACENT = (
     "Food & Beverage",
     "Health",

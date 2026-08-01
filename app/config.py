@@ -7,7 +7,10 @@ class Settings(BaseSettings):
     app_name: str = "Viral Trend Intelligence"
     database_url: str = "sqlite:///./data/trends.db"
     region: str = "ID"          # target negara (Indonesia)
-    vertical: str = "fnb"       # vertikal awal (F&B)
+    platform: str = "tiktok"    # platform default (lihat scrapers/registry.py)
+    # Peninggalan waktu produk masih dikunci di satu vertikal. Cakupan sekarang
+    # semua industri; nilai ini cuma dipakai sebagai default filter awal.
+    vertical: str = "fnb"
     request_timeout: int = 20   # detik, buat httpx
     # Sesi login Playwright. Default: profil terpisah `.pw-profile` (gitignore).
     # Buat pakai Chrome asli: set profile_dir ke folder "User Data" Chrome +

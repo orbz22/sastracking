@@ -85,6 +85,38 @@ sastracking/
 - [x] `.env.example` + `app/config.py`
 - **Done when:** `uvicorn app.api:app` nyala walau kosong. ✅ `/health`=200, DB `trends.db` kebentuk otomatis.
 
+### M1b — Multi-platform + lepas dari kunci F&B  ✅ SELESAI (2026-08-02)
+Arah produk berubah: bukan lagi "dashboard F&B di TikTok", tapi **intelijen tren
+multi-platform lintas industri** — TikTok dikerjakan lebih dulu, Instagram dan
+YouTube menyusul.
+
+- [x] `scrapers/registry.py` — daftar `Platform` (key, label, scraper, kategori,
+      industri, catatan). Platform tanpa scraper tetap terdaftar `available=False`
+      supaya tampil "Segera" di UI, bukan disembunyikan.
+- [x] `Trend.platform` (index, default `tiktok`). `external_id` hanya unik DI DALAM
+      satu platform → semua pencarian/upsert wajib menyertakan platform.
+- [x] **Migrasi ringan** di `db.py` (`_MIGRATIONS` + `ALTER TABLE ... ADD COLUMN`).
+      `create_all()` tidak menyentuh tabel yang sudah ada, jadi tanpa ini data lama
+      harus dibuang tiap skema berubah. Terbukti: 169 tren + 315 snapshot selamat.
+- [x] `pipeline.run_pipeline(platform=...)` — tidak lagi menyebut TikTok sama sekali;
+      scraper & daftar industri diambil dari registry.
+- [x] API: `?platform=` di `/` dan `/trends`, endpoint baru `/platforms`.
+- [x] Dashboard: grup **Platform** di sidebar (TikTok aktif, IG/YT "Segera"),
+      judul & breadcrumb ikut platform, footer nampilkan jumlah industri.
+- [x] **Cakupan industri: 6 (tetangga F&B) → 15 (semua)**. Daftar dibaca langsung
+      dari dropdown Creative Center, bukan ditebak. `FNB_ADJACENT` dipertahankan
+      buat sapuan cepat.
+- ⚠️ Konsekuensi durasi: sapuan penuh jadi 3 periode × 15 industri = **45 kombinasi
+  ≈ 22 menit** (dari ~10 menit). Praktis mewajibkan **M7 scheduler**.
+- 🐛 Diperbaiki sekalian: sparkline KPI "Total views" menjumlahkan snapshot lintas
+  jendela → hari yang punya data 90-hari (kumulatif) bikin delta% ngawur
+  (−92,9% padahal datanya naik). Sekarang dikunci ke satu jendela.
+
+**Sumber untuk platform berikutnya (belum diriset dalam):**
+- Instagram — belum ada padanan Creative Center yang terbuka.
+- YouTube — kandidat paling jelas: YouTube Data API resmi (butuh API key, ada kuota
+  harian). Tidak perlu scraping browser.
+
 ### M1 — Scraper spike: Creative Center  ✅ PROVEN + F&B filter
 - [x] `scrapers/base.py`: interface `fetch_trends(...) -> list[dict]`
 - [x] `scrapers/creative_center.py` + `scripts/run_once.py`: narik tren hashtag ID nyata (posts/views)

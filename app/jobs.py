@@ -1,8 +1,10 @@
 """Job refresh data di background.
 
-Scrape butuh ~3 menit dan membuka jendela Chrome, jadi tidak boleh dijalankan
-langsung di dalam request HTTP. Job dijalankan di thread terpisah; dashboard
-cukup menanyakan statusnya.
+Scrape butuh puluhan menit (sapuan penuh: periode × semua industri) dan membuka
+jendela Chrome, jadi tidak boleh dijalankan langsung di dalam request HTTP. Job
+dijalankan di thread terpisah; dashboard cukup menanyakan statusnya.
+
+kwargs diteruskan apa adanya ke run_pipeline (platform, periods, industries, ...).
 """
 
 import threading

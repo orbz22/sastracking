@@ -12,7 +12,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ app_name }} — Dashboard Tren {{ vertical }}</title>
+<title>{{ app_name }} — Tren {{ platform.label }} {{ region }}</title>
 {% if job.running %}<meta http-equiv="refresh" content="10">{% endif %}
 <link rel="stylesheet" href="/static/app.css">
 </head>
@@ -31,11 +31,23 @@
       </span>
     </div>
 
-    <div class="nav-label">Menu</div>
-    <a class="nav-item" href="{{ q({}) }}" aria-current="page">
-      {{ ui.icon("grid") }} Dashboard
-    </a>
-    <a class="nav-item" href="{{ q(state, category='hashtag') }}">
+    <div class="nav-label">Platform</div>
+    {% for p in platforms %}
+      {% if p.available %}
+      <a class="nav-item" href="{{ q(state, platform=p.key, industry=None, category=None) }}"
+         {% if p.key == platform.key %}aria-current="page"{% endif %}>
+        {{ ui.icon(p.key) }} {{ p.label }}
+      </a>
+      {% else %}
+      <span class="nav-item" aria-disabled="true" title="{{ p.note }}">
+        {{ ui.icon(p.key) }} {{ p.label }} <span class="soon">Segera</span>
+      </span>
+      {% endif %}
+    {% endfor %}
+
+    <div class="nav-label">Kategori</div>
+    <a class="nav-item" href="{{ q(state, category='hashtag') }}"
+       {% if category == 'hashtag' %}aria-current="page"{% endif %}>
       {{ ui.icon("hash") }} Hashtag
     </a>
     <span class="nav-item" aria-disabled="true" title="Scraper kategori sound belum dibangun (M1)">
@@ -46,13 +58,13 @@
     </span>
 
     <div class="nav-label">Data</div>
-    <a class="nav-item" href="/trends?category={{ category }}">{{ ui.icon("code") }} API Tren</a>
+    <a class="nav-item" href="/trends?category={{ category }}&platform={{ platform.key }}">{{ ui.icon("code") }} API Tren</a>
     <a class="nav-item" href="/docs">{{ ui.icon("book") }} Dokumentasi API</a>
     <a class="nav-item" href="/health">{{ ui.icon("layers") }} Status Sistem</a>
 
     <div class="sidebar-foot">
-      Region <b>{{ region }}</b> · Vertikal <b>{{ vertical }}</b><br>
-      Sumber: TikTok Creative Center
+      Region <b>{{ region }}</b> · {{ industries|length }} industri<br>
+      {{ platform.note }}
       {% if last_day %}<br>Data terakhir: {{ last_day }}{% endif %}
     </div>
   </nav>
@@ -62,8 +74,8 @@
 
     <header class="topbar">
       <div>
-        <h1>Tren {{ vertical }} — {{ region }}</h1>
-        <div class="crumb">Dashboard / {{ category|capitalize }}{% if industry %} / {{ industry }}{% endif %}</div>
+        <h1>Tren {{ platform.label }} — {{ region }}</h1>
+        <div class="crumb">{{ platform.label }} / {{ category|capitalize }} / {{ industry or "Semua industri" }}</div>
       </div>
       <div class="topbar-right">
         <form method="post" action="/refresh">
@@ -166,7 +178,8 @@
           <div class="kpi-value num">{{ total_views|compact }}</div>
           <div class="kpi-foot">
             {% if spark_views and spark_views.delta is not none %}
-              <span class="delta {{ 'up' if spark_views.delta >= 0 else 'down' }}">
+              <span class="delta {{ 'up' if spark_views.delta >= 0 else 'down' }}"
+                    title="Perubahan total views pada jendela {{ spark_period }} hari, {{ days }} hari terakhir">
                 {{ spark_views.delta|pct(1) }}
               </span>
               {{ spark(spark_views) }}
