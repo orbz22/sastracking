@@ -16,9 +16,8 @@ class Trend(SQLModel, table=True):
     industry: str | None = None                    # mis. "Games", "News & Entertainment"
     url: str | None = None
     region: str = "ID"
-    # peninggalan waktu produk masih dikunci di satu vertikal (F&B). Sekarang
-    # cakupannya semua industri, jadi industry yang dipakai buat segmentasi.
-    vertical: str | None = None
+    # (kolom `vertical` dihapus — peninggalan waktu produk masih dikunci di F&B,
+    #  tidak pernah dibaca. Segmentasi sekarang lewat `industry`.)
     first_seen: datetime = Field(default_factory=datetime.utcnow)
 
 

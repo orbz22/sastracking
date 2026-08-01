@@ -10,6 +10,10 @@ ini. Default cakupan: SEMUA industri (bukan lagi khusus F&B).
 Satu kombinasi filter = 100 baris (sudah login). Views antar-period TIDAK
 sebanding (7 hari vs 90 hari kumulatif), jadi period ikut disimpan di tiap
 snapshot dan metrik hanya membandingkan period yang sama.
+
+Penyimpanan dibuat tahan-gagal: satu baris bermasalah tidak boleh menghanguskan
+sapuan yang makan puluhan menit (pernah kejadian — constraint NOT NULL sisa
+skema lama bikin seluruh hasil scrape terbuang).
 """
 
 from datetime import date
@@ -19,6 +23,50 @@ from sqlmodel import Session, select
 from app.db import engine, init_db
 from app.models import Snapshot, Trend
 from app.scrapers.registry import DEFAULT_PLATFORM, get_platform, get_scraper
+
+
+def _save(s: Session, platform: str, it: dict, today: date) -> bool:
+    """Upsert satu tren + snapshot hariannya. True kalau trennya baru."""
+    trend = s.exec(
+        select(Trend).where(
+            Trend.platform == platform,
+            Trend.external_id == it["external_id"],
+            Trend.category == it["category"],
+            Trend.region == it["region"],
+        )
+    ).first()
+
+    is_new = trend is None
+    if trend is None:
+        trend = Trend(
+            platform=platform,
+            external_id=it["external_id"],
+            category=it["category"],
+            name=it["name"],
+            industry=it.get("industry"),
+            url=it.get("url"),
+            region=it["region"],
+        )
+        s.add(trend)
+        s.commit()
+        s.refresh(trend)
+
+    period = it.get("period", 7)
+    snap = s.exec(
+        select(Snapshot).where(
+            Snapshot.trend_id == trend.id,
+            Snapshot.captured_on == today,
+            Snapshot.period == period,
+        )
+    ).first()
+    if snap is None:
+        snap = Snapshot(trend_id=trend.id, captured_on=today, period=period)
+    snap.views = it.get("views")
+    snap.video_count = it.get("posts")
+    snap.rank = it.get("rank")
+    s.add(snap)
+    s.commit()
+    return is_new
 
 
 def run_pipeline(
@@ -35,6 +83,7 @@ def run_pipeline(
     industries = industries or plat.industries
     new_trends = 0
     snaps = 0
+    failed = 0
     today = date.today()
 
     with Session(engine) as s:
@@ -46,49 +95,24 @@ def run_pipeline(
                 region=region,
             )
             for it in items:
-                trend = s.exec(
-                    select(Trend).where(
-                        Trend.platform == plat.key,
-                        Trend.external_id == it["external_id"],
-                        Trend.category == it["category"],
-                        Trend.region == it["region"],
-                    )
-                ).first()
-                if trend is None:
-                    trend = Trend(
-                        platform=plat.key,
-                        external_id=it["external_id"],
-                        category=it["category"],
-                        name=it["name"],
-                        industry=it.get("industry"),
-                        url=it.get("url"),
-                        region=it["region"],
-                    )
-                    s.add(trend)
-                    s.commit()
-                    s.refresh(trend)
-                    new_trends += 1
+                try:
+                    if _save(s, plat.key, it, today):
+                        new_trends += 1
+                    snaps += 1
+                except Exception as e:  # noqa: BLE001
+                    s.rollback()
+                    failed += 1
+                    if failed <= 5:  # contoh secukupnya, jangan banjirin log
+                        print(
+                            f"[warn] gagal simpan {it.get('external_id')}: "
+                            f"{type(e).__name__}: {str(e)[:120]}"
+                        )
 
-                period = it.get("period", 7)
-                snap = s.exec(
-                    select(Snapshot).where(
-                        Snapshot.trend_id == trend.id,
-                        Snapshot.captured_on == today,
-                        Snapshot.period == period,
-                    )
-                ).first()
-                if snap is None:
-                    snap = Snapshot(
-                        trend_id=trend.id, captured_on=today, period=period
-                    )
-                snap.views = it.get("views")
-                snap.video_count = it.get("posts")
-                snap.rank = it.get("rank")
-                s.add(snap)
-                s.commit()
-                snaps += 1
-
-    return {"new_trends": new_trends, "snapshots": snaps, "platform": plat.key}
+    out = {"new_trends": new_trends, "snapshots": snaps, "platform": plat.key}
+    if failed:
+        out["failed"] = failed
+        print(f"[warn] {failed} baris gagal disimpan (sisanya tetap tersimpan)")
+    return out
 
 
 if __name__ == "__main__":

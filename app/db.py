@@ -23,9 +23,16 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("trend", "platform", "VARCHAR DEFAULT 'tiktok'"),
 ]
 
+# Kolom yang dibuang. Menghapus field dari model saja TIDAK cukup: kolom lama
+# tetap ada di tabel lengkap dengan constraint-nya. `trend.vertical` dulu NOT
+# NULL, jadi begitu model berhenti mengisinya, semua INSERT ditolak.
+_DROP_COLUMNS: list[tuple[str, str]] = [
+    ("trend", "vertical"),
+]
+
 
 def _apply_migrations() -> None:
-    """Tambah kolom yang belum ada. Aman dijalankan berulang."""
+    """Selaraskan tabel lama dengan model sekarang. Aman dijalankan berulang."""
     insp = inspect(engine)
     tables = set(insp.get_table_names())
     with engine.begin() as conn:
@@ -36,6 +43,14 @@ def _apply_migrations() -> None:
                 continue
             conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
             print(f"[db] kolom {table}.{column} ditambahkan")
+
+        for table, column in _DROP_COLUMNS:
+            if table not in tables:
+                continue
+            if column not in {c["name"] for c in insp.get_columns(table)}:
+                continue
+            conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))
+            print(f"[db] kolom {table}.{column} dihapus")
 
 
 def init_db() -> None:
