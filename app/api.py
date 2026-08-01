@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from app import charts, jobs
 from app.config import settings
 from app.db import get_session, init_db
-from app.metrics import compute
+from app.metrics import compute, mark_viral
 from app.models import Snapshot, Trend
 
 
@@ -102,10 +102,14 @@ def _collect(
         # ikut hilang, bukan jatuh ke period lain (views antar-period nggak sebanding)
         if period and not snaps:
             continue
-        row = _row(t, snaps)
-        if only_viral and not row["is_viral"]:
-            continue
-        rows.append(row)
+        rows.append(_row(t, snaps))
+
+    # penandaan viral bersifat relatif terhadap kohort, jadi harus lihat SEMUA
+    # baris dulu — baru boleh disaring only_viral
+    mark_viral(rows)
+    if only_viral:
+        rows = [r for r in rows if r["is_viral"]]
+
     rows.sort(
         key=lambda r: (
             not r["is_viral"],
@@ -127,11 +131,12 @@ def list_trends(
     region: str | None = None,
     industry: str | None = None,
     only_viral: bool = False,
+    period: int | None = Query(None, description="jendela sumber: 7 / 30 / 90 hari"),
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_session),
 ):
-    rows = _collect(session, category, region, only_viral, limit, industry)
-    return {"count": len(rows), "category": category, "trends": rows}
+    rows = _collect(session, category, region, only_viral, limit, industry, period)
+    return {"count": len(rows), "category": category, "period": period, "trends": rows}
 
 
 @app.get("/trends/{trend_id}")

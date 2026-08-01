@@ -8,16 +8,19 @@ Ambang bersifat KALIBRASI KASAR — sesuaikan setelah data beberapa minggu ngali
 """
 
 from dataclasses import dataclass
+from math import ceil
 
 from app.models import Snapshot
 
 
 @dataclass(frozen=True)
 class ViralThresholds:
-    min_views: int = 1_000_000        # minimal views biar dianggap kandidat viral
-    min_velocity: float = 500_000.0   # Δviews/hari minimal
+    min_views: int = 1_000_000        # dipakai HANYA buat kohort kecil (lihat mark_viral)
+    min_velocity: float = 500_000.0   # idem
     up_rate: float = 0.10             # >10%/hari => naik
     down_rate: float = -0.05          # <-5%/hari => turun
+    top_pct: float = 0.10             # viral = 10% teratas dalam kohortnya
+    min_cohort: int = 5               # di bawah ini, persentil ga bermakna
 
 
 def series(snaps: list[Snapshot], prefer: tuple[int, ...] = (7, 30, 90)) -> list[Snapshot]:
@@ -98,6 +101,58 @@ def is_viral(snaps: list[Snapshot], th: ViralThresholds) -> bool:
     v = views_velocity(snaps)
     # kalau baru 1 hari (velocity None) tapi views sudah besar -> tetap kandidat
     return v is None or v >= th.min_velocity
+
+
+def mark_viral(rows: list[dict], th: ViralThresholds | None = None) -> list[dict]:
+    """Tandai `is_viral` secara RELATIF: 10% teratas dalam kohortnya sendiri.
+
+    Kohort = (industri, jendela/period). Alasan tidak pakai ambang absolut:
+    setelah login, satu kombinasi mengembalikan 100 baris — ambang 1 juta views
+    meloloskan 96 dari 100, jadi tidak memisahkan apa pun. Basis persentil juga
+    adil antar-industri: F&B tidak dibandingkan dengan Games yang volumenya
+    beda kelas, dan ikut menyesuaikan sendiri kalau volume TikTok bergeser.
+
+    Dua kolam terpisah di tiap kohort:
+      - punya velocity  -> diurut velocity (momentum, sinyal "viral SEKARANG")
+      - belum ada velocity (data <2 hari) -> diurut views, biar tren baru tetap
+        bisa muncul dan tidak tenggelam cuma karena historinya belum ada
+    Industri dengan < `min_cohort` baris digabung jadi satu kohort "sisa" per
+    jendela, bukan dibiarkan pakai ambang absolut — kalau dibiarkan, industri
+    berisi 2 baris otomatis meloloskan 1 baris sebagai viral (top 10% dari 2
+    selalu >= 1), dan itu yang bikin angka flag membengkak.
+
+    Mengubah `rows` di tempat dan mengembalikannya.
+    """
+    th = th or ViralThresholds()
+    cohorts: dict[tuple, list[dict]] = {}
+    for r in rows:
+        cohorts.setdefault((r.get("industry"), r.get("period")), []).append(r)
+
+    # gabung industri bervolume tipis ke kohort sisa per jendela
+    merged: dict[tuple, list[dict]] = {}
+    for (ind, period), members in cohorts.items():
+        key = (ind, period) if len(members) >= th.min_cohort else ("__sisa__", period)
+        merged.setdefault(key, []).extend(members)
+
+    for members in merged.values():
+        if len(members) < th.min_cohort:
+            continue  # tetap terlalu tipis -> biarkan ambang absolut dari compute()
+        for key in ("velocity", "views"):
+            pool = [
+                m
+                for m in members
+                if (m.get("velocity") is not None) == (key == "velocity")
+                and m.get(key) is not None
+            ]
+            if not pool:
+                continue
+            pool.sort(key=lambda m: m[key], reverse=True)
+            cut = max(1, ceil(len(pool) * th.top_pct))
+            for i, m in enumerate(pool):
+                m["is_viral"] = i < cut
+                m["cohort_rank"] = i + 1
+                m["cohort_size"] = len(pool)
+    return rows
 
 
 def compute(snaps: list[Snapshot], th: ViralThresholds | None = None) -> dict:

@@ -125,8 +125,18 @@ sastracking/
 - ⚠️ **Ambang viral jadi tidak berarti.** Distribusi 100 baris F&B (7 hari, 2026-08-02):
   median 3,5 jt views, p90 29 jt, max 1,6 M views. Ambang `min_views=1 jt` meloloskan
   **96 dari 100**. Waktu datanya cuma 3 baris teratas ini nggak kelihatan karena
-  ketiganya memang viral. **Perlu rekalibrasi** — lihat M2 (belum diputuskan:
-  naikkan ambang absolut vs ganti ke basis persentil per kohort).
+  ketiganya memang viral.
+- ✅ **Rekalibrasi (diputuskan 2026-08-02): basis persentil, bukan ambang absolut.**
+  `metrics.mark_viral()`: viral = **10% teratas dalam kohort (industri × jendela)**.
+  Alasan dipilih: adil antar-industri (F&B tidak diadu dengan Games), menyesuaikan
+  sendiri kalau volume TikTok bergeser, dan jumlah yang di-flag tetap stabil.
+  - Dua kolam per kohort: punya velocity → diurut velocity (momentum); belum punya
+    (data <2 hari) → diurut views, biar tren baru tidak tenggelam.
+  - Industri bervolume tipis digabung jadi kohort "sisa" per jendela. Kalau tidak,
+    industri berisi 2 baris otomatis meloloskan 1 (top 10% dari 2 selalu ≥1) —
+    ini sempat bikin angka flag membengkak 28%.
+  - Hasil: 96% → **15% keseluruhan, 12% di kohort F&B/7 hari**.
+  - Penandaan bersifat relatif → wajib dihitung SEBELUM filter `only_viral`.
 
 **Temuan riset lapangan (penting):**
 - Creative Center rebrand → **"TikTok One Creative Suite"**, URL tren: `ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=ID&period=7`
