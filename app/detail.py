@@ -9,7 +9,9 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 
+from app.config import settings
 from app.models import InterestPoint, Snapshot, Trend
+from app.scrapers.parallel import fetch_details_parallel
 from app.scrapers.registry import get_scraper
 
 
@@ -132,14 +134,17 @@ def sync_many(
     if not picked:
         return {"picked": 0, "saved": 0, "points": 0, "tanpa_id_sumber": no_source}
 
-    scraper = get_scraper(platform)
     by_id = {t.source_id: t for t in picked}
-    got = scraper.fetch_details_many(
-        [t.source_id for t in picked],
-        region=picked[0].region,
-        period=period,
-        on_progress=lambda i, n, sid: print(f"  [detail {i}/{n}] {sid}"),
-    )
+    ids = [t.source_id for t in picked]
+    if settings.parallel_tabs > 1 and platform == "tiktok":
+        got = fetch_details_parallel(ids, region=picked[0].region, period=period)
+    else:
+        got = get_scraper(platform).fetch_details_many(
+            ids,
+            region=picked[0].region,
+            period=period,
+            on_progress=lambda i, n, sid: print(f"  [detail {i}/{n}] {sid}"),
+        )
 
     saved = points = 0
     for sid, data in got.items():

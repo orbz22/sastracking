@@ -41,6 +41,70 @@ def sparkline(values: list[float], w: int = 112, h: int = 32, pad: int = 4) -> d
     }
 
 
+def line_chart(
+    points: list[tuple[date, float]],
+    w: int = 860,
+    h: int = 260,
+    pad_l: int = 38,
+    pad_r: int = 14,
+    pad_t: int = 30,  # ruang buat label puncak di atas garis; 14 bikin kepotong
+    pad_b: int = 30,
+) -> dict | None:
+    """Geometri line chart "Interest over time" (skala Y dikunci 0-100).
+
+    Y sengaja TIDAK diskalakan ke min/max data: nilainya memang indeks 0-100,
+    jadi sumbu yang mengambang bikin kenaikan kecil kelihatan dramatis.
+
+    Label X dipilih selektif (~6 tanggal) — kurva 90 hari punya ~40 titik dan
+    memberi label semuanya cuma jadi tumpukan teks yang tidak terbaca.
+    """
+    pts = [(d, v) for d, v in points if v is not None]
+    if len(pts) < 2:
+        return None
+
+    iw, ih = w - pad_l - pad_r, h - pad_t - pad_b
+    step = iw / (len(pts) - 1)
+
+    def y_of(v: float) -> float:
+        return pad_t + ih - (max(0.0, min(100.0, v)) / 100) * ih
+
+    coords = [(pad_l + i * step, y_of(v)) for i, (_, v) in enumerate(pts)]
+    line = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+    area = (
+        f"M{coords[0][0]:.1f},{pad_t + ih:.1f} "
+        + " ".join(f"L{x:.1f},{y:.1f}" for x, y in coords)
+        + f" L{coords[-1][0]:.1f},{pad_t + ih:.1f} Z"
+    )
+
+    every = max(1, round(len(pts) / 6))
+    peak_i = max(range(len(pts)), key=lambda i: pts[i][1])
+
+    return {
+        "w": w,
+        "h": h,
+        "x0": pad_l,
+        "x1": pad_l + iw,
+        "y0": pad_t,
+        "y1": pad_t + ih,
+        "line": line,
+        "area": area,
+        "points": [
+            {
+                "x": round(coords[i][0], 1),
+                "y": round(coords[i][1], 1),
+                "date": pts[i][0].strftime("%d/%m/%y"),
+                "value": pts[i][1],
+                "tick": i % every == 0 or i == len(pts) - 1,
+                "peak": i == peak_i,
+            }
+            for i in range(len(pts))
+        ],
+        "yticks": [{"v": v, "y": round(y_of(v), 1)} for v in (0, 25, 50, 75, 100)],
+        "peak": {"date": pts[peak_i][0], "value": pts[peak_i][1]},
+        "last": {"date": pts[-1][0], "value": pts[-1][1]},
+    }
+
+
 def daily_totals(snaps: list[Snapshot]) -> list[tuple[date, int, int]]:
     """[(tanggal, total views, jumlah tren)] urut menaik."""
     agg: dict[date, list[int]] = defaultdict(lambda: [0, 0])

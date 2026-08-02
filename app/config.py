@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Batas ronde scroll per kombinasi. Sudah login, TikTok mentok ~100 baris
     # (~12 ronde). 40 = ruang aman; turunin kalau refresh kelamaan.
     scroll_max_rounds: int = 40
+    # Jumlah tab yang jalan barengan saat scrape. Naikin = lebih cepat tapi lebih
+    # berat (tiap tab = satu renderer Chrome) dan makin mirip pola bot.
+    parallel_tabs: int = 4
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"

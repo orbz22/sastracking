@@ -220,9 +220,7 @@ def trend_page(
             "period": period,
             "available_periods": available,
             # kurva sumber (indeks 0-100) vs histori kita sendiri (views absolut)
-            "interest": charts.sparkline(
-                [p.value for p in points], w=760, h=190, pad=12
-            ),
+            "interest": charts.line_chart([(p.on_date, p.value) for p in points]),
             "points": points,
             "own_history": [
                 {"date": s.captured_on, "views": s.views, "period": s.period}

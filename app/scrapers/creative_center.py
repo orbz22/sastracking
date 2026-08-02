@@ -218,7 +218,9 @@ class CreativeCenterScraper(TrendScraper):
                 pass
             page.wait_for_timeout(6_000)
             data = self._parse_detail(page, region, period)
-            data["interest"] = self._sweep_chart(page)
+            data["interest"] = self._sweep_chart(
+                page, self.SWEEP_STEPS.get(period, 40)
+            )
             ctx.close()
         return data
 
@@ -252,7 +254,9 @@ class CreativeCenterScraper(TrendScraper):
                         pass
                     page.wait_for_timeout(3_500)
                     data = self._parse_detail(page, region, period)
-                    data["interest"] = self._sweep_chart(page)
+                    data["interest"] = self._sweep_chart(
+                page, self.SWEEP_STEPS.get(period, 40)
+            )
                     out[sid] = data
                 except Exception as e:  # satu gagal jangan hentikan sisanya
                     print(f"[warn] detail {sid} gagal: {type(e).__name__}: {str(e)[:80]}")
@@ -290,6 +294,10 @@ class CreativeCenterScraper(TrendScraper):
             "industries": industries,
         }
 
+    # Jumlah langkah sapuan per jendela. Kurva 7 hari cuma punya ~7 titik —
+    # menyapunya 40 kali murni buang waktu (40 x 160ms = 6,4 detik per hashtag).
+    SWEEP_STEPS = {7: 14, 30: 38, 90: 60}
+
     @staticmethod
     def _sweep_chart(page, steps: int = 40) -> list[dict]:
         """Sapu kursor di atas kanvas kurva, baca tooltip tiap langkah.
@@ -297,8 +305,15 @@ class CreativeCenterScraper(TrendScraper):
         Tooltip formatnya "26/07/26\\n26/07/26\\n90.8" (tanggal diulang + nilai).
         Nilai = indeks 0-100 relatif puncak kurva, BUKAN views.
         """
+        # Tidak semua hashtag punya kurva (yang datanya tipis tidak digambar).
+        # Tanpa penjagaan ini, bounding_box() menunggu 30 detik penuh untuk
+        # kanvas yang memang tidak akan pernah ada — diam-diam, per hashtag.
         try:
-            box = page.locator("canvas").first.bounding_box()
+            page.wait_for_selector("canvas", timeout=6_000)
+        except Exception:
+            return []
+        try:
+            box = page.locator("canvas").first.bounding_box(timeout=3_000)
         except Exception:
             return []
         if not box:

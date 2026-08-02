@@ -20,8 +20,10 @@ from datetime import date
 
 from sqlmodel import Session, select
 
+from app.config import settings
 from app.db import engine, init_db
 from app.models import Snapshot, Trend
+from app.scrapers.parallel import fetch_many_parallel
 from app.scrapers.registry import DEFAULT_PLATFORM, get_platform, get_scraper
 
 
@@ -99,12 +101,20 @@ def run_pipeline(
 
     with Session(engine) as s:
         for category in categories:
-            items = scraper.fetch_many(
-                category=category,
-                periods=periods,
-                industries=industries,
-                region=region,
-            )
+            if settings.parallel_tabs > 1 and plat.key == "tiktok":
+                items = fetch_many_parallel(
+                    category=category,
+                    periods=periods,
+                    industries=industries,
+                    region=region,
+                )
+            else:
+                items = scraper.fetch_many(
+                    category=category,
+                    periods=periods,
+                    industries=industries,
+                    region=region,
+                )
             for it in items:
                 try:
                     if _save(s, plat.key, it, today):

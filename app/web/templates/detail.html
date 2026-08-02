@@ -109,17 +109,104 @@
         </div>
         <div class="card-body">
           {% if interest %}
-          <svg class="spark" width="100%" height="{{ interest.h }}"
-               viewBox="0 0 {{ interest.w }} {{ interest.h }}" preserveAspectRatio="none"
-               role="img" aria-label="Kurva minat {{ points|length }} hari">
-            <path class="fill" d="{{ interest.area }}"/>
-            <polyline class="stroke" points="{{ interest.line }}"/>
-          </svg>
-          <div class="mix-legend" style="margin-top:10px">
-            {% for p in points %}
-            <span>{{ p.on_date.strftime("%d/%m") }} <b>{{ p.value }}</b></span>
-            {% endfor %}
-          </div>
+          <figure class="chart" id="chart">
+            <svg viewBox="0 0 {{ interest.w }} {{ interest.h }}" role="img"
+                 aria-label="Kurva minat {{ trend.name }}, {{ points|length }} titik,
+                             puncak {{ interest.peak.value }} pada
+                             {{ interest.peak.date.strftime('%d/%m/%y') }}">
+              <!-- gridline + label sumbu Y: dikunci 0-100, bukan min/max data -->
+              {% for t in interest.yticks %}
+              <line class="grid" x1="{{ interest.x0 }}" x2="{{ interest.x1 }}"
+                    y1="{{ t.y }}" y2="{{ t.y }}"/>
+              <text class="axis" x="{{ interest.x0 - 8 }}" y="{{ t.y + 4 }}"
+                    text-anchor="end">{{ t.v }}</text>
+              {% endfor %}
+
+              <path class="area" d="{{ interest.area }}"/>
+              <polyline class="line" points="{{ interest.line }}"/>
+
+              {% for p in interest.points %}
+                {% if p.tick %}
+                <text class="axis" x="{{ p.x }}" y="{{ interest.y1 + 20 }}"
+                      text-anchor="middle">{{ p.date[:5] }}</text>
+                {% endif %}
+                {% if p.peak %}
+                <circle class="dot-peak" cx="{{ p.x }}" cy="{{ p.y }}" r="4"/>
+                <text class="peak-label" x="{{ p.x }}" y="{{ p.y - 10 }}"
+                      text-anchor="middle">{{ "%g"|format(p.value) }}</text>
+                {% endif %}
+              {% endfor %}
+
+              <!-- lapisan hover: garis bidik + titik aktif -->
+              <line class="crosshair" id="ch" x1="0" x2="0"
+                    y1="{{ interest.y0 }}" y2="{{ interest.y1 }}" style="opacity:0"/>
+              <circle class="dot-live" id="dot" r="4.5" style="opacity:0"/>
+              <rect id="hit" x="{{ interest.x0 }}" y="{{ interest.y0 }}"
+                    width="{{ interest.x1 - interest.x0 }}"
+                    height="{{ interest.y1 - interest.y0 }}"
+                    fill="transparent" style="cursor:crosshair"/>
+            </svg>
+            <div class="tip" id="tip" role="status" aria-live="polite"></div>
+          </figure>
+
+          {# tooltip menambah, tidak menggantikan: angkanya tetap bisa dibaca
+             tanpa hover — dan tanpa menumpuk 40 angka di bawah chart #}
+          <details class="tbl-toggle">
+            <summary>Lihat angkanya ({{ points|length }} titik)</summary>
+            <div class="table-wrap" style="margin-top:10px">
+              <table>
+                <thead><tr><th scope="col">Tanggal</th>
+                  <th scope="col" class="right">Indeks</th></tr></thead>
+                <tbody>
+                  {% for p in points %}
+                  <tr><td>{{ p.on_date.strftime("%d/%m/%Y") }}</td>
+                      <td class="right num">{{ "%g"|format(p.value) }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <script>
+          (() => {
+            const data = [
+              {% for p in interest.points %}
+              {x: {{ p.x }}, y: {{ p.y }}, d: "{{ p.date }}", v: "{{ "%g"|format(p.value) }}"},
+              {% endfor %}
+            ];
+            const svg = document.querySelector("#chart svg");
+            const hit = document.getElementById("hit");
+            const ch  = document.getElementById("ch");
+            const dot = document.getElementById("dot");
+            const tip = document.getElementById("tip");
+            const VB = {{ interest.w }};
+
+            function show(evt) {
+              const box = svg.getBoundingClientRect();
+              // koordinat layar -> koordinat viewBox
+              const vx = (evt.clientX - box.left) / box.width * VB;
+              let best = data[0];
+              for (const p of data) {
+                if (Math.abs(p.x - vx) < Math.abs(best.x - vx)) best = p;
+              }
+              ch.setAttribute("x1", best.x); ch.setAttribute("x2", best.x);
+              dot.setAttribute("cx", best.x); dot.setAttribute("cy", best.y);
+              ch.style.opacity = 1; dot.style.opacity = 1;
+              // textContent, bukan innerHTML — isinya data dari luar
+              tip.textContent = "";
+              const v = document.createElement("b"); v.textContent = best.v;
+              const d = document.createElement("span"); d.textContent = best.d;
+              tip.append(v, d);
+              tip.style.opacity = 1;
+              tip.style.left = (best.x / VB * box.width) + "px";
+            }
+            function hide() {
+              ch.style.opacity = 0; dot.style.opacity = 0; tip.style.opacity = 0;
+            }
+            hit.addEventListener("pointermove", show);
+            hit.addEventListener("pointerleave", hide);
+          })();
+          </script>
           {% elif trend.source_id %}
           <div class="empty">
             {{ ui.icon("inbox") }}
