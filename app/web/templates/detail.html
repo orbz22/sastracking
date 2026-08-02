@@ -47,7 +47,7 @@
         {% endif %}
         {% if trend.url %}
         <a class="btn btn-ghost" href="{{ trend.url }}" target="_blank" rel="noopener"
-           title="Feed video di halaman tag publik bisa kosong — lihat catatan di bawah chart">
+           title="Sering kosong kalau dibuka di web browser; normal di aplikasi HP — lihat catatan di bawah chart">
           {{ ui.icon("tiktok") }} Halaman tag
         </a>
         {% endif %}
@@ -241,11 +241,12 @@
           Bedanya dengan histori kita di bawah: kurva ini sudah dipunya sumber sejak
           awal, sedangkan histori kita baru terbentuk sejak hari pertama scrape.
           <br><br>
-          <b>Halaman tag publik bisa kosong</b> ("Page not available") walau angkanya
-          besar — biasanya pada hashtag kampanye berbayar, yang feed videonya hanya
-          disajikan di dalam aplikasi. Itu perilaku {{ platform.label }}, bukan tanda
-          angkanya keliru: angka di atas berasal dari data iklan resmi dan naik
-          konsisten tiap hari. Pakai <b>Halaman sumber</b> kalau mau verifikasi.
+          <b>Halaman tag di web browser sering kosong</b> ("Page not available") walau
+          hashtagnya ramai. Diuji 2026-08-02 pada tiga hashtag berbeda: <b>ketiganya
+          normal di aplikasi {{ platform.label }} HP, ketiganya kosong di web laptop.</b>
+          Jadi itu keterbatasan {{ platform.label }} web — bukan tanda angka di atas
+          keliru, dan tidak berkaitan dengan jenis hashtagnya. Verifikasi paling andal:
+          cari hashtagnya lewat aplikasi HP, atau buka <b>Halaman sumber</b>.
         </div>
       </section>
 
