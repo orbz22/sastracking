@@ -38,9 +38,17 @@
         </div>
       </div>
       <div class="topbar-right">
+        {# Halaman sumber didahulukan: selalu tersedia. Halaman tag publik bisa
+           kosong (hashtag kampanye berbayar / feed cuma disajikan di app). #}
+        {% if source_url %}
+        <a class="btn btn-ghost" href="{{ source_url }}" target="_blank" rel="noopener">
+          {{ ui.icon("layers") }} Halaman sumber
+        </a>
+        {% endif %}
         {% if trend.url %}
-        <a class="btn btn-ghost" href="{{ trend.url }}" target="_blank" rel="noopener">
-          {{ ui.icon("tiktok") }} Buka di {{ platform.label }}
+        <a class="btn btn-ghost" href="{{ trend.url }}" target="_blank" rel="noopener"
+           title="Feed video di halaman tag publik bisa kosong — lihat catatan di bawah chart">
+          {{ ui.icon("tiktok") }} Halaman tag
         </a>
         {% endif %}
         <form method="post" action="/t/{{ trend.id }}/sync?period={{ period }}">
@@ -232,6 +240,12 @@
           membandingkan dua hashtag secara absolut, hanya bentuk naik/turunnya.
           Bedanya dengan histori kita di bawah: kurva ini sudah dipunya sumber sejak
           awal, sedangkan histori kita baru terbentuk sejak hari pertama scrape.
+          <br><br>
+          <b>Halaman tag publik bisa kosong</b> ("Page not available") walau angkanya
+          besar — biasanya pada hashtag kampanye berbayar, yang feed videonya hanya
+          disajikan di dalam aplikasi. Itu perilaku {{ platform.label }}, bukan tanda
+          angkanya keliru: angka di atas berasal dari data iklan resmi dan naik
+          konsisten tiap hari. Pakai <b>Halaman sumber</b> kalau mau verifikasi.
         </div>
       </section>
 

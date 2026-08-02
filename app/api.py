@@ -13,6 +13,7 @@ from app.detail import interest_series, refresh_detail
 from app.db import get_session, init_db
 from app.metrics import compute, mark_viral
 from app.models import Snapshot, Trend
+from app.scrapers.creative_center import CreativeCenterScraper
 from app.scrapers.registry import DEFAULT_PLATFORM, PLATFORMS, get_platform
 
 
@@ -218,6 +219,14 @@ def trend_page(
             "trend": trend,
             "row": row,
             "period": period,
+            # halaman sumber selalu ada selama source_id terekam; halaman tag
+            # publik tidak selalu (lihat catatan di template)
+            "source_url": (
+                f"{CreativeCenterScraper.DETAIL_URL.format(id=trend.source_id)}"
+                f"?region={trend.region}&period={period}"
+                if trend.source_id and trend.platform == "tiktok"
+                else None
+            ),
             "available_periods": available,
             # kurva sumber (indeks 0-100) vs histori kita sendiri (views absolut)
             "interest": charts.line_chart([(p.on_date, p.value) for p in points]),
