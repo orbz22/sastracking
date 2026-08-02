@@ -120,12 +120,22 @@
             <span>{{ p.on_date.strftime("%d/%m") }} <b>{{ p.value }}</b></span>
             {% endfor %}
           </div>
-          {% else %}
+          {% elif trend.source_id %}
           <div class="empty">
             {{ ui.icon("inbox") }}
             <h3>Kurva belum ditarik</h3>
             <p>Klik <b>Tarik dari sumber</b> di kanan atas. Butuh ~20 detik dan
                membuka jendela Chrome.</p>
+          </div>
+          {% else %}
+          <div class="empty">
+            {{ ui.icon("alert") }}
+            <h3>Belum bisa ditarik — ID sumber tidak ada</h3>
+            <p>Tren ini ke-scrape <b>sebelum</b> fitur perekaman ID detail dibuat,
+               jadi kita belum tahu alamat halaman detailnya di {{ platform.label }}.
+               Tombol di kanan atas sengaja dimatikan.</p>
+            <p>Jalankan <b>Ambil data baru</b> sekali dari dashboard — ID-nya terisi
+               otomatis selama hashtag ini masih muncul di daftar sumber.</p>
           </div>
           {% endif %}
         </div>

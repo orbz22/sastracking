@@ -106,10 +106,11 @@ def sync_many(
     jadi diprioritaskan: yang punya id sumber, views terbesar duluan. Dipakai
     oleh job harian supaya kurvanya sudah siap sebelum dibuka orang.
     """
-    q = select(Trend).where(
-        Trend.platform == platform, Trend.source_id.is_not(None)
-    )
-    candidates = list(s.exec(q).all())
+    semua = list(s.exec(select(Trend).where(Trend.platform == platform)).all())
+    candidates = [t for t in semua if t.source_id]
+    # baris lama ke-scrape sebelum id sumber ikut direkam -> nggak bisa dibuka
+    # halaman detailnya. Dilaporkan biar jelas kenapa jumlahnya nggak sesuai.
+    no_source = len(semua) - len(candidates)
 
     if only_missing:
         punya = {
@@ -129,7 +130,7 @@ def sync_many(
     candidates.sort(key=lambda t: views.get(t.id, 0), reverse=True)
     picked = candidates[:limit]
     if not picked:
-        return {"picked": 0, "saved": 0, "points": 0}
+        return {"picked": 0, "saved": 0, "points": 0, "tanpa_id_sumber": no_source}
 
     scraper = get_scraper(platform)
     by_id = {t.source_id: t for t in picked}
@@ -153,7 +154,13 @@ def sync_many(
             s.rollback()
             print(f"[warn] simpan kurva {sid} gagal: {type(e).__name__}: {e}")
 
-    return {"picked": len(picked), "saved": saved, "points": points, "period": period}
+    return {
+        "picked": len(picked),
+        "saved": saved,
+        "points": points,
+        "period": period,
+        "tanpa_id_sumber": no_source,
+    }
 
 
 def interest_series(s: Session, trend_id: int, period: int = 7) -> list[InterestPoint]:

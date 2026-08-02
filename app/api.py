@@ -358,6 +358,12 @@ def dashboard(
             if t.industry
         }
     )
+    # berapa tren yang siap ditarik kurvanya (butuh id sumber) — biar user tahu
+    # kenapa "Tarik kurva" cuma menyentuh sebagian
+    ready = sum(1 for t in session.exec(
+        select(Trend).where(Trend.platform == plat.key)
+    ).all() if t.source_id)
+
     state = {
         "category": category,
         "industry": industry,
@@ -385,6 +391,7 @@ def dashboard(
             "period": period,
             "metric": metric,
             "state": state,
+            "ready_for_curve": ready,
             "job": jobs.status(),
             "bars": charts.rank_bars(rows, metric),
             "ind_rank": charts.by_industry(rows),

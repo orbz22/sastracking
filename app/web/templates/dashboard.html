@@ -64,6 +64,7 @@
 
     <div class="sidebar-foot">
       Region <b>{{ region }}</b> · {{ industries|length }} industri<br>
+      Siap ditarik kurvanya: <b>{{ ready_for_curve }}</b> / {{ trends|length }}<br>
       {{ platform.note }}
       {% if last_day %}<br>Data terakhir: {{ last_day }}{% endif %}
     </div>
@@ -79,8 +80,8 @@
       </div>
       <div class="topbar-right">
         <form method="post" action="/details/sync?limit=50&amp;platform={{ platform.key }}">
-          <button class="btn btn-ghost" {% if job.running %}disabled{% endif %}
-                  title="Tarik kurva 'Interest over time' 50 tren teratas sekaligus (~11 menit), biar tidak perlu klik satu-satu">
+          <button class="btn btn-ghost" {% if job.running or not ready_for_curve %}disabled{% endif %}
+                  title="{% if ready_for_curve %}Tarik kurva 'Interest over time' 50 tren teratas sekaligus (~11 menit). Hanya tren yang sudah punya ID sumber ({{ ready_for_curve }} tren) yang bisa ditarik.{% else %}Belum ada tren yang punya ID sumber — jalankan 'Ambil data baru' dulu{% endif %}">
             {{ ui.icon("trending") }} Tarik kurva
           </button>
         </form>
