@@ -112,8 +112,31 @@ def line_chart(
     }
 
 
-def daily_totals(snaps: list[Snapshot]) -> list[tuple[date, int, int]]:
-    """[(tanggal, total views, jumlah tren)] urut menaik."""
+def daily_totals(
+    snaps: list[Snapshot], like_for_like: bool = True
+) -> list[tuple[date, int, int]]:
+    """[(tanggal, total views, jumlah tren)] urut menaik.
+
+    `like_for_like`: hanya hitung tren yang punya snapshot di SEMUA tanggal.
+    Tanpa ini, total harian ikut naik cuma karena cakupan scrape bertambah —
+    pernah menghasilkan "+6527%" padahal yang berubah jumlah tren yang
+    dilacak (53 -> 3.968), bukan popularitasnya.
+    """
+    if not snaps:
+        return []
+
+    if like_for_like:
+        days = {s.captured_on for s in snaps}
+        per_trend: dict[int, set[date]] = defaultdict(set)
+        for s in snaps:
+            per_trend[s.trend_id].add(s.captured_on)
+        tetap = {tid for tid, d in per_trend.items() if d == days}
+        # kalau tidak ada satu pun tren yang hadir di semua tanggal, deret
+        # like-for-like kosong -> lebih baik tidak menampilkan apa pun
+        snaps = [s for s in snaps if s.trend_id in tetap]
+        if not snaps:
+            return []
+
     agg: dict[date, list[int]] = defaultdict(lambda: [0, 0])
     for s in snaps:
         agg[s.captured_on][0] += s.views or 0

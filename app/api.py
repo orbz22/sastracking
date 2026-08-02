@@ -54,6 +54,10 @@ def _q(base: dict, **over) -> str:
     return "/?" + urlencode(clean) if clean else "/"
 
 
+# Batas baris tabel dashboard. Cuma memotong TAMPILAN — semua statistik di
+# atasnya tetap dihitung dari seluruh baris hasil filter.
+TABLE_LIMIT = 200
+
 templates.env.filters["compact"] = _compact
 templates.env.filters["pct"] = _pct
 templates.env.globals["q"] = _q
@@ -77,11 +81,17 @@ def _collect(
     category: str,
     region: str | None,
     only_viral: bool,
-    limit: int = 200,
+    limit: int | None = 200,
     industry: str | None = None,
     period: int | None = None,
     platform: str = DEFAULT_PLATFORM,
 ) -> list[dict]:
+    """limit=None mengembalikan SEMUA baris.
+
+    Penting buat statistik: baris diurutkan viral-duluan, jadi menghitung
+    persentase dari hasil yang sudah dipotong selalu memberi angka ngawur
+    (pernah kejadian: "200 dari 200 viral, 100%").
+    """
     q = select(Trend).where(
         Trend.platform == platform, Trend.category == category
     )
@@ -124,7 +134,7 @@ def _collect(
             r["rank"] if r["rank"] is not None else 9999,
         )
     )
-    return rows[:limit]
+    return rows if limit is None else rows[:limit]
 
 
 @app.get("/health")
@@ -328,24 +338,27 @@ def dashboard(
 ):
     plat = get_platform(platform)
     category = category if category in plat.categories else plat.categories[0]
-    rows = _collect(
+    # semua baris dulu -> statistik dihitung dari sini; tabel baru dipotong
+    all_rows = _collect(
         session,
         category,
         settings.region,
         only_viral,
+        limit=None,
         industry=industry,
         period=period,
         platform=plat.key,
     )
-    viral_count = sum(1 for r in rows if r["is_viral"])
-    rising = sum(1 for r in rows if r["status"] == "naik")
-    total_views = sum(r["views"] or 0 for r in rows)
+    viral_count = sum(1 for r in all_rows if r["is_viral"])
+    rising = sum(1 for r in all_rows if r["status"] == "naik")
+    total_views = sum(r["views"] or 0 for r in all_rows)
+    rows = all_rows[:TABLE_LIMIT]
 
     # Deret harian buat sparkline KPI (butuh >=2 hari data). WAJIB dikunci ke
     # satu jendela: kalau dicampur, hari yang kebetulan punya snapshot 90-hari
     # (kumulatif) bikin totalnya melonjak dan delta%-nya jadi omong kosong.
     spark_period = period or 7
-    ids = [r["id"] for r in rows]
+    ids = [r["id"] for r in all_rows]
     snaps = (
         list(
             session.exec(
@@ -394,6 +407,8 @@ def dashboard(
             "category": category,
             "only_viral": only_viral,
             "trends": rows,
+            "total_rows": len(all_rows),
+            "table_limit": TABLE_LIMIT,
             "viral_count": viral_count,
             "rising": rising,
             "total_views": total_views,
@@ -404,9 +419,11 @@ def dashboard(
             "state": state,
             "ready_for_curve": ready,
             "job": jobs.status(),
-            "bars": charts.rank_bars(rows, metric),
-            "ind_rank": charts.by_industry(rows),
-            "mix": charts.status_mix(rows),
+            # semuanya dari all_rows: peringkat & komposisi harus dihitung dari
+            # seluruh baris, bukan dari 200 yang kebetulan tampil di tabel
+            "bars": charts.rank_bars(all_rows, metric),
+            "ind_rank": charts.by_industry(all_rows),
+            "mix": charts.status_mix(all_rows),
             "spark_views": charts.sparkline([d[1] for d in daily]),
             "spark_trends": charts.sparkline([float(d[2]) for d in daily]),
             "days": len(daily),

@@ -158,7 +158,7 @@
             <span class="kpi-label">Tren dilacak</span>
             <span class="kpi-icon">{{ ui.icon("hash") }}</span>
           </div>
-          <div class="kpi-value num">{{ trends|length }}</div>
+          <div class="kpi-value num">{{ total_rows }}</div>
           <div class="kpi-foot">
             <span>{{ days }} hari data terkumpul</span>
             {% if spark_trends %}{{ spark(spark_trends) }}
@@ -173,7 +173,7 @@
           </div>
           <div class="kpi-value num">{{ viral_count }}</div>
           <div class="kpi-foot">
-            <span>{{ (viral_count / trends|length * 100)|round|int if trends else 0 }}% dari tren terlacak</span>
+            <span>{{ (viral_count / total_rows * 100)|round|int if total_rows else 0 }}% dari tren terlacak</span>
           </div>
         </div>
 
@@ -290,8 +290,13 @@
       <!-- ============ tabel ============ -->
       <section class="card">
         <div class="card-head">
-          <h2>Semua tren</h2>
-          <span class="hint">{{ trends|length }} baris{% if period %} · jendela {{ period }} hari{% endif %}</span>
+          <h2>Daftar tren</h2>
+          <span class="hint">
+            {% if total_rows > table_limit %}
+              {{ table_limit }} teratas dari {{ total_rows }} baris
+            {% else %}{{ total_rows }} baris{% endif %}
+            {%- if period %} · jendela {{ period }} hari{% endif %}
+          </span>
         </div>
 
         {% if trends %}
