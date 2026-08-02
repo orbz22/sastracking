@@ -306,7 +306,7 @@
               <tr>
                 <td class="c-rank num">{{ t.rank or "–" }}</td>
                 <td class="c-name">
-                  <a href="{{ t.url }}" target="_blank" rel="noopener">{{ t.name }}</a>
+                  <a href="/t/{{ t.id }}{% if period %}?period={{ period }}{% endif %}">{{ t.name }}</a>
                   {% if t.is_viral %}<span class="pill-viral"
                      title="{% if t.cohort_rank %}Peringkat {{ t.cohort_rank }} dari {{ t.cohort_size }} di {{ t.industry or 'kohort sisa' }} · jendela {{ t.period }} hari{% else %}Ambang absolut (kohort terlalu kecil untuk diperingkat){% endif %}"
                      >{{ ui.icon("flame") }}Viral</span>{% endif %}

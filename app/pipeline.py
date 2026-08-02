@@ -46,10 +46,16 @@ def _save(s: Session, platform: str, it: dict, today: date) -> bool:
             industry=it.get("industry"),
             url=it.get("url"),
             region=it["region"],
+            source_id=it.get("source_id"),
         )
         s.add(trend)
         s.commit()
         s.refresh(trend)
+    elif it.get("source_id") and not trend.source_id:
+        # baris lama ke-scrape sebelum id numerik ikut diambil -> lengkapi
+        trend.source_id = it["source_id"]
+        s.add(trend)
+        s.commit()
 
     period = it.get("period", 7)
     snap = s.exec(

@@ -1,4 +1,5 @@
 import re
+from datetime import date
 
 from playwright.sync_api import sync_playwright
 
@@ -159,10 +160,15 @@ class CreativeCenterScraper(TrendScraper):
         seen: dict[str, dict] = {}
 
         def grab() -> None:
+            ids = self._row_source_ids(page)
             for r in self._parse_hashtags(
                 page.inner_text("body"), region, period, industry
             ):
-                seen.setdefault(r["external_id"], r)
+                r["source_id"] = ids.get(r["external_id"])
+                prev = seen.setdefault(r["external_id"], r)
+                # baris bisa muncul lagi di ronde lain dgn link sudah ter-render
+                if prev.get("source_id") is None and r.get("source_id"):
+                    prev["source_id"] = r["source_id"]
 
         stale = 0
         for _ in range(max_rounds):
@@ -182,6 +188,117 @@ class CreativeCenterScraper(TrendScraper):
             if stale >= stale_limit:
                 break
         return list(seen.values())
+
+    DETAIL_URL = "https://ads.tiktok.com/creative/creativeCenter/trends/hashtag/{id}"
+
+    def fetch_detail(
+        self, source_id: str, region: str | None = None, period: int = 7
+    ) -> dict:
+        """Ambil isi halaman detail satu hashtag.
+
+        Yang bisa diambil: kurva "Interest over time", daftar industri (bisa lebih
+        dari satu), posts/views, dan top regions.
+
+        Kurvanya digambar ke <canvas>, jadi TIDAK ada di DOM dan tidak lewat XHR —
+        satu-satunya jalan adalah menyapu kursor di atas kanvas dan membaca
+        tooltip yang muncul. Lambat (~15 detik) dan rapuh terhadap perubahan
+        layout, karena itu dipanggil on-demand per hashtag, bukan di sapuan massal.
+        """
+        region = region or settings.region
+        url = f"{self.DETAIL_URL.format(id=source_id)}?region={region}&period={period}"
+        with sync_playwright() as p:
+            ctx = open_context(p, self.headless)
+            page = ctx.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+            try:
+                page.wait_for_function(
+                    "() => /#\\w/.test(document.body.innerText)", timeout=30_000
+                )
+            except Exception:
+                pass
+            page.wait_for_timeout(6_000)
+            data = self._parse_detail(page, region, period)
+            data["interest"] = self._sweep_chart(page)
+            ctx.close()
+        return data
+
+    @staticmethod
+    def _parse_detail(page, region: str, period: int) -> dict:
+        lines = [ln.strip() for ln in page.inner_text("body").split("\n") if ln.strip()]
+        name = next((ln for ln in lines if ln.startswith("#")), None)
+
+        posts = views = None
+        for k, ln in enumerate(lines):
+            if ln == "Posts" and k + 1 < len(lines):
+                posts = _num(lines[k + 1])
+            elif ln == "Views" and k + 1 < len(lines):
+                views = _num(lines[k + 1])
+
+        # industri = baris antara nama hashtag dan tombol "Copy link"
+        industries: list[str] = []
+        if name in lines:
+            for ln in lines[lines.index(name) + 1 :]:
+                if ln in ("Copy link", "Insights"):
+                    break
+                industries.append(ln)
+
+        return {
+            "name": name,
+            "region": region,
+            "period": period,
+            "posts": posts,
+            "views": views,
+            "industries": industries,
+        }
+
+    @staticmethod
+    def _sweep_chart(page, steps: int = 40) -> list[dict]:
+        """Sapu kursor di atas kanvas kurva, baca tooltip tiap langkah.
+
+        Tooltip formatnya "26/07/26\\n26/07/26\\n90.8" (tanggal diulang + nilai).
+        Nilai = indeks 0-100 relatif puncak kurva, BUKAN views.
+        """
+        try:
+            box = page.locator("canvas").first.bounding_box()
+        except Exception:
+            return []
+        if not box:
+            return []
+
+        found: dict[str, float] = {}
+        for i in range(steps):
+            frac = (i + 0.5) / steps
+            try:
+                page.mouse.move(
+                    box["x"] + box["width"] * frac, box["y"] + box["height"] * 0.5
+                )
+                page.wait_for_timeout(160)
+                tips = page.evaluate(
+                    "() => [...document.querySelectorAll('[class*=tooltip],"
+                    "[class*=Tooltip],[role=tooltip]')]"
+                    ".map(e => e.innerText.trim()).filter(Boolean)"
+                )
+            except Exception:
+                continue
+            if not tips:
+                continue
+            parts = [x.strip() for x in tips[0].split("\n") if x.strip()]
+            if len(parts) < 2:
+                continue
+            day, raw = parts[0], parts[-1]
+            try:
+                found[day] = float(raw.replace(",", ""))
+            except ValueError:
+                continue
+
+        out = []
+        for day, value in found.items():
+            try:  # sumber pakai DD/MM/YY
+                d, m, y = (int(x) for x in day.split("/"))
+                out.append({"date": date(2000 + y, m, d), "value": value})
+            except (ValueError, TypeError):
+                continue
+        return sorted(out, key=lambda x: x["date"])
 
     def fetch_many(
         self,
@@ -224,6 +341,35 @@ class CreativeCenterScraper(TrendScraper):
                     )
             ctx.close()
         return list(seen.values())
+
+    # Pasangkan nama hashtag <-> id numerik sumber. Naik dari tiap <a> detail ke
+    # elemen leluhur yang memuat teks barisnya, jadi pasangannya ikut DOM — bukan
+    # menebak lewat urutan (list-nya ter-virtualisasi, urutan tidak bisa dipercaya).
+    _JS_ROW_IDS = """
+    () => {
+      const out = {};
+      for (const a of document.querySelectorAll('a')) {
+        const href = a.getAttribute('href') || '';
+        const m = href.match(/trends\\/hashtag\\/(\\d+)/);
+        if (!m) continue;
+        let el = a, name = null;
+        for (let i = 0; i < 6 && el; i++, el = el.parentElement) {
+          const t = (el.innerText || '').trim();
+          const hit = t.match(/#[^\\s\\n]+/);
+          if (hit) { name = hit[0]; break; }
+        }
+        if (name) out[name.replace(/^#/, '')] = m[1];
+      }
+      return out;
+    }
+    """
+
+    @classmethod
+    def _row_source_ids(cls, page) -> dict[str, str]:
+        try:
+            return page.evaluate(cls._JS_ROW_IDS) or {}
+        except Exception:
+            return {}
 
     @staticmethod
     def _select_industry(page, industry: str) -> None:

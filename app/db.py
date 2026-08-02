@@ -21,6 +21,7 @@ engine = create_engine(
 _MIGRATIONS: list[tuple[str, str, str]] = [
     # (tabel, kolom, definisi SQL)
     ("trend", "platform", "VARCHAR DEFAULT 'tiktok'"),
+    ("trend", "source_id", "VARCHAR"),
 ]
 
 # Kolom yang dibuang. Menghapus field dari model saja TIDAK cukup: kolom lama

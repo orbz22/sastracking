@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 
 from app import charts, jobs
 from app.config import settings
+from app.detail import interest_series, refresh_detail
 from app.db import get_session, init_db
 from app.metrics import compute, mark_viral
 from app.models import Snapshot, Trend
@@ -166,6 +167,77 @@ def list_platforms():
         }
         for p in PLATFORMS.values()
     ]
+
+
+@app.get("/t/{trend_id}", response_class=HTMLResponse)
+def trend_page(
+    request: Request,
+    trend_id: int,
+    period: int = 7,
+    session: Session = Depends(get_session),
+):
+    """Halaman detail satu tren — padanan 'See analytics' di Creative Center."""
+    trend = session.get(Trend, trend_id)
+    if trend is None:
+        raise HTTPException(status_code=404, detail="tren tidak ditemukan")
+
+    snaps = sorted(
+        session.exec(select(Snapshot).where(Snapshot.trend_id == trend.id)).all(),
+        key=lambda x: x.captured_on,
+    )
+    # is_viral itu peringkat relatif, jadi tren ini harus diadu dengan kohortnya
+    # dulu. Kalau cuma _row() sendirian, yang kepakai ambang absolut dan kartu
+    # status bakal mengklaim "10% teratas" tanpa pernah membandingkan apa pun.
+    cohort = _collect(
+        session,
+        trend.category,
+        trend.region,
+        only_viral=False,
+        limit=100_000,
+        industry=trend.industry,
+        period=period,
+        platform=trend.platform,
+    )
+    row = next((r for r in cohort if r["id"] == trend.id), None) or _row(trend, snaps)
+    points = interest_series(session, trend.id, period)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="detail.html",
+        context={
+            "app_name": settings.app_name,
+            "region": settings.region,
+            "platform": get_platform(trend.platform),
+            "platforms": list(PLATFORMS.values()),
+            "trend": trend,
+            "row": row,
+            "period": period,
+            # kurva sumber (indeks 0-100) vs histori kita sendiri (views absolut)
+            "interest": charts.sparkline(
+                [p.value for p in points], w=760, h=190, pad=12
+            ),
+            "points": points,
+            "own_history": [
+                {"date": s.captured_on, "views": s.views, "period": s.period}
+                for s in snaps
+                if s.period == period
+            ],
+            "job": jobs.status(),
+        },
+    )
+
+
+@app.post("/t/{trend_id}/sync")
+def trend_sync(trend_id: int, period: int = 7, session: Session = Depends(get_session)):
+    """Tarik ulang detail dari sumber SEKARANG (bukan nunggu sapuan harian)."""
+    trend = session.get(Trend, trend_id)
+    if trend is None:
+        raise HTTPException(status_code=404, detail="tren tidak ditemukan")
+    try:
+        refresh_detail(session, trend, period)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    return RedirectResponse(f"/t/{trend_id}?period={period}", status_code=303)
 
 
 @app.get("/trends/{trend_id}")
