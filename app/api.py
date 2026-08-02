@@ -173,7 +173,7 @@ def list_platforms():
 def trend_page(
     request: Request,
     trend_id: int,
-    period: int = 7,
+    period: int | None = None,
     session: Session = Depends(get_session),
 ):
     """Halaman detail satu tren — padanan 'See analytics' di Creative Center."""
@@ -185,6 +185,12 @@ def trend_page(
         session.exec(select(Snapshot).where(Snapshot.trend_id == trend.id)).all(),
         key=lambda x: x.captured_on,
     )
+    # Jangan paksa 7 hari: banyak tren cuma ke-scrape di jendela 30/90, dan
+    # halamannya jadi ngaco — kartu nampilin angka 90 hari sementara tab kurva
+    # bilang 7 hari. Pilih jendela terpendek yang trennya benar-benar punya.
+    available = sorted({s.period for s in snaps})
+    if period not in available:
+        period = available[0] if available else 7
     # is_viral itu peringkat relatif, jadi tren ini harus diadu dengan kohortnya
     # dulu. Kalau cuma _row() sendirian, yang kepakai ambang absolut dan kartu
     # status bakal mengklaim "10% teratas" tanpa pernah membandingkan apa pun.
@@ -212,6 +218,7 @@ def trend_page(
             "trend": trend,
             "row": row,
             "period": period,
+            "available_periods": available,
             # kurva sumber (indeks 0-100) vs histori kita sendiri (views absolut)
             "interest": charts.sparkline(
                 [p.value for p in points], w=760, h=190, pad=12
@@ -263,16 +270,32 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
 
 
 @app.post("/refresh")
-def refresh(quick: bool = False, platform: str = DEFAULT_PLATFORM):
+def refresh(
+    quick: bool = False,
+    platform: str = DEFAULT_PLATFORM,
+    details: int = Query(0, ge=0, le=500, description="jumlah kurva ikut ditarik"),
+):
     """Mulai ambil data baru di background lalu balik ke dashboard.
 
     quick=True: hanya F&B periode 7 hari (~30 detik) buat cek cepat.
     Penuh: semua industri × 3 periode — puluhan menit, lihat catatan di M7.
+    details=N: sekalian tarik kurva N tren teratas (~13 detik per tren).
     """
-    kwargs: dict = {"platform": platform}
+    kwargs: dict = {"platform": platform, "details": details}
     if quick:
         kwargs |= {"periods": (7,), "industries": ("Food & Beverage",)}
     jobs.start_refresh(**kwargs)  # kalau sudah jalan, diabaikan
+    return RedirectResponse(f"/?platform={platform}", status_code=303)
+
+
+@app.post("/details/sync")
+def details_sync(
+    limit: int = Query(50, ge=1, le=500),
+    period: int = 7,
+    platform: str = DEFAULT_PLATFORM,
+):
+    """Tarik kurva massal tanpa scrape ulang list-nya (job background)."""
+    jobs.start_details(limit=limit, period=period, platform=platform)
     return RedirectResponse(f"/?platform={platform}", status_code=303)
 
 

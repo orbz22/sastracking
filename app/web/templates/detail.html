@@ -99,8 +99,9 @@
         <div class="card-head">
           <h2>Interest over time</h2>
           <span class="hint">kurva dari {{ platform.label }} · jendela {{ period }} hari</span>
+          {# cuma jendela yang trennya benar-benar punya datanya #}
           <span class="seg" style="margin-left:auto">
-            {% for p in [7, 30, 90] %}
+            {% for p in available_periods or [period] %}
             <a href="/t/{{ trend.id }}?period={{ p }}"
                aria-current="{{ 'true' if period == p else 'false' }}">{{ p }} hari</a>
             {% endfor %}

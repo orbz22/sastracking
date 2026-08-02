@@ -222,6 +222,45 @@ class CreativeCenterScraper(TrendScraper):
             ctx.close()
         return data
 
+    def fetch_details_many(
+        self,
+        source_ids: list[str],
+        region: str | None = None,
+        period: int = 7,
+        on_progress=None,
+    ) -> dict[str, dict]:
+        """Ambil detail banyak hashtag dalam SATU browser.
+
+        fetch_detail() membuka-tutup browser tiap panggilan (~6 detik terbuang
+        per tren). Untuk puluhan/ratusan tren, biaya itu dominan — di sini
+        browser dipakai ulang, tinggal ganti halaman.
+        """
+        region = region or settings.region
+        out: dict[str, dict] = {}
+        with sync_playwright() as p:
+            ctx = open_context(p, self.headless)
+            page = ctx.new_page()
+            for i, sid in enumerate(source_ids, 1):
+                url = f"{self.DETAIL_URL.format(id=sid)}?region={region}&period={period}"
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                    try:
+                        page.wait_for_function(
+                            "() => /#\\w/.test(document.body.innerText)", timeout=20_000
+                        )
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(3_500)
+                    data = self._parse_detail(page, region, period)
+                    data["interest"] = self._sweep_chart(page)
+                    out[sid] = data
+                except Exception as e:  # satu gagal jangan hentikan sisanya
+                    print(f"[warn] detail {sid} gagal: {type(e).__name__}: {str(e)[:80]}")
+                if on_progress:
+                    on_progress(i, len(source_ids), sid)
+            ctx.close()
+        return out
+
     @staticmethod
     def _parse_detail(page, region: str, period: int) -> dict:
         lines = [ln.strip() for ln in page.inner_text("body").split("\n") if ln.strip()]

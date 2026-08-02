@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 
-from app.models import InterestPoint, Trend
+from app.models import InterestPoint, Snapshot, Trend
 from app.scrapers.registry import get_scraper
 
 
@@ -63,6 +63,97 @@ def refresh_detail(s: Session, trend: Trend, period: int = 7) -> dict:
         "points": len(data.get("interest", [])),
         "period": period,
     }
+
+
+def _store(s: Session, trend: Trend, data: dict, period: int) -> int:
+    """Tulis kurva satu tren (replace, lihat alasan di refresh_detail)."""
+    for point in s.exec(
+        select(InterestPoint).where(
+            InterestPoint.trend_id == trend.id, InterestPoint.period == period
+        )
+    ).all():
+        s.delete(point)
+
+    now = datetime.utcnow()
+    pts = data.get("interest", [])
+    for pt in pts:
+        s.add(
+            InterestPoint(
+                trend_id=trend.id,
+                on_date=pt["date"],
+                value=pt["value"],
+                period=period,
+                fetched_at=now,
+            )
+        )
+    inds = data.get("industries") or []
+    if inds and not trend.industry:
+        trend.industry = inds[0]
+        s.add(trend)
+    return len(pts)
+
+
+def sync_many(
+    s: Session,
+    limit: int = 100,
+    period: int = 7,
+    platform: str = "tiktok",
+    only_missing: bool = True,
+) -> dict:
+    """Tarik kurva untuk banyak tren sekaligus, tanpa perlu diklik satu-satu.
+
+    Menarik SEMUA tren tidak masuk akal (~13 detik × ribuan baris = berjam-jam),
+    jadi diprioritaskan: yang punya id sumber, views terbesar duluan. Dipakai
+    oleh job harian supaya kurvanya sudah siap sebelum dibuka orang.
+    """
+    q = select(Trend).where(
+        Trend.platform == platform, Trend.source_id.is_not(None)
+    )
+    candidates = list(s.exec(q).all())
+
+    if only_missing:
+        punya = {
+            p.trend_id
+            for p in s.exec(
+                select(InterestPoint).where(InterestPoint.period == period)
+            ).all()
+        }
+        candidates = [t for t in candidates if t.id not in punya]
+
+    # urutkan pakai views snapshot terakhir -> yang paling ramai duluan
+    views: dict[int, int] = {}
+    for snap in s.exec(
+        select(Snapshot).where(Snapshot.period == period)
+    ).all():
+        views[snap.trend_id] = max(views.get(snap.trend_id, 0), snap.views or 0)
+    candidates.sort(key=lambda t: views.get(t.id, 0), reverse=True)
+    picked = candidates[:limit]
+    if not picked:
+        return {"picked": 0, "saved": 0, "points": 0}
+
+    scraper = get_scraper(platform)
+    by_id = {t.source_id: t for t in picked}
+    got = scraper.fetch_details_many(
+        [t.source_id for t in picked],
+        region=picked[0].region,
+        period=period,
+        on_progress=lambda i, n, sid: print(f"  [detail {i}/{n}] {sid}"),
+    )
+
+    saved = points = 0
+    for sid, data in got.items():
+        trend = by_id.get(sid)
+        if trend is None:
+            continue
+        try:
+            points += _store(s, trend, data, period)
+            s.commit()
+            saved += 1
+        except Exception as e:  # noqa: BLE001
+            s.rollback()
+            print(f"[warn] simpan kurva {sid} gagal: {type(e).__name__}: {e}")
+
+    return {"picked": len(picked), "saved": saved, "points": points, "period": period}
 
 
 def interest_series(s: Session, trend_id: int, period: int = 7) -> list[InterestPoint]:

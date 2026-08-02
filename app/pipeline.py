@@ -81,7 +81,12 @@ def run_pipeline(
     industries: tuple[str, ...] | None = None,
     region: str | None = None,
     platform: str = DEFAULT_PLATFORM,
+    details: int = 0,
 ) -> dict:
+    """`details` = berapa tren teratas yang kurvanya ikut ditarik setelah sapuan.
+
+    0 = lewati (kurva ditarik manual per tren dari halaman detailnya).
+    """
     init_db()
     plat = get_platform(platform)
     scraper = get_scraper(platform)
@@ -113,6 +118,19 @@ def run_pipeline(
                             f"[warn] gagal simpan {it.get('external_id')}: "
                             f"{type(e).__name__}: {str(e)[:120]}"
                         )
+
+        # kurva ditarik SETELAH semua baris tersimpan, biar kalau bagian ini
+        # gagal/dihentikan, hasil sapuan utamanya tetap aman
+        if details:
+            from app.detail import sync_many  # lokal: hindari impor melingkar
+
+            try:
+                print(
+                    "[detail]",
+                    sync_many(s, limit=details, period=periods[0], platform=plat.key),
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"[warn] tarik kurva gagal: {type(e).__name__}: {e}")
 
     out = {"new_trends": new_trends, "snapshots": snaps, "platform": plat.key}
     if failed:

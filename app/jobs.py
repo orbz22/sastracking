@@ -50,8 +50,27 @@ def _run(kwargs: dict) -> None:
         )
 
 
-def start_refresh(**kwargs) -> bool:
-    """Mulai refresh. False kalau job lain masih jalan."""
+def _run_details(kwargs: dict) -> None:
+    """Tarik kurva massal — pakai slot job yang sama biar tidak rebutan browser."""
+    from sqlmodel import Session
+
+    from app.db import engine, init_db
+    from app.detail import sync_many
+
+    try:
+        init_db()
+        with Session(engine) as s:
+            result = sync_many(s, **kwargs)
+        err = None
+    except Exception as e:
+        result, err = None, f"{type(e).__name__}: {e}"[:300]
+    with _lock:
+        _state.update(
+            running=False, finished_at=datetime.now(), result=result, error=err
+        )
+
+
+def _start(target, kwargs: dict) -> bool:
     with _lock:
         if _state["running"]:
             return False
@@ -62,5 +81,15 @@ def start_refresh(**kwargs) -> bool:
             result=None,
             error=None,
         )
-    threading.Thread(target=_run, args=(kwargs,), daemon=True).start()
+    threading.Thread(target=target, args=(kwargs,), daemon=True).start()
     return True
+
+
+def start_refresh(**kwargs) -> bool:
+    """Mulai refresh. False kalau job lain masih jalan."""
+    return _start(_run, kwargs)
+
+
+def start_details(**kwargs) -> bool:
+    """Mulai tarik kurva massal. False kalau job lain masih jalan."""
+    return _start(_run_details, kwargs)
