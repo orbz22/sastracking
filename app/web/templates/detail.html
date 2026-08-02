@@ -90,43 +90,40 @@
 
     <main class="content" id="main">
 
-      <section class="kpis" aria-label="Ringkasan">
-        <div class="card kpi">
-          <div class="kpi-top"><span class="kpi-label">Views</span>
-            <span class="kpi-icon">{{ ui.icon("eye") }}</span></div>
-          <div class="kpi-value num">{{ row.views|compact }}</div>
-          <div class="kpi-foot"><span>jendela {{ row.period or period }} hari</span></div>
+      <section class="stats" aria-label="Ringkasan">
+        <div class="card stat-lead">
+          <span class="label">Status</span>
+          <span class="value" style="text-transform:capitalize">{{ row.status }}</span>
+          <span class="sub">
+            {%- if row.cohort_rank -%}
+              Peringkat {{ row.cohort_rank }} dari {{ row.cohort_size }}
+              di {{ trend.industry or "kohort sisa" }}
+            {%- elif row.is_viral -%}
+              Lolos ambang absolut — kohortnya terlalu kecil untuk diperingkat
+            {%- else -%}
+              Belum masuk 10% teratas kohortnya
+            {%- endif -%}
+          </span>
         </div>
-        <div class="card kpi">
-          <div class="kpi-top"><span class="kpi-label">Posts</span>
-            <span class="kpi-icon">{{ ui.icon("hash") }}</span></div>
-          <div class="kpi-value num">{{ row.video_count|compact }}</div>
-          <div class="kpi-foot"><span>{{ row.views_per_post|compact }} views/post</span></div>
-        </div>
-        <div class="card kpi {% if row.is_viral %}accent{% endif %}">
-          <div class="kpi-top"><span class="kpi-label">Status</span>
-            <span class="kpi-icon">{{ ui.icon("flame") }}</span></div>
-          <div class="kpi-value" style="font-size:22px;text-transform:capitalize">{{ row.status }}</div>
-          <div class="kpi-foot">
-            <span>
-              {%- if row.cohort_rank -%}
-                Peringkat {{ row.cohort_rank }} dari {{ row.cohort_size }} di
-                {{ trend.industry or "kohort sisa" }}
-              {%- elif row.is_viral -%}
-                Lolos ambang absolut (kohort terlalu kecil untuk diperingkat)
-              {%- else -%}
-                Belum masuk 10% teratas kohortnya
-              {%- endif -%}
+
+        <div class="card stat-grid">
+          <div class="stat-cell">
+            <span class="label">Views</span>
+            <span class="value num">{{ row.views|compact }}</span>
+            <span class="sub">jendela {{ row.period or period }} hari</span>
+          </div>
+          <div class="stat-cell">
+            <span class="label">Posts</span>
+            <span class="value num">{{ row.video_count|compact }}</span>
+            <span class="sub">{{ row.views_per_post|compact }} views per post</span>
+          </div>
+          <div class="stat-cell">
+            <span class="label">Velocity</span>
+            <span class="value num">
+              {%- if row.velocity %}+{{ row.velocity|compact }}{% else %}n/a{% endif -%}
             </span>
+            <span class="sub">{{ row.history_days }} hari histori kita</span>
           </div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-top"><span class="kpi-label">Velocity</span>
-            <span class="kpi-icon">{{ ui.icon("trending") }}</span></div>
-          <div class="kpi-value num">
-            {% if row.velocity %}+{{ row.velocity|compact }}{% else %}n/a{% endif %}
-          </div>
-          <div class="kpi-foot"><span>{{ row.history_days }} hari histori kita</span></div>
         </div>
       </section>
 

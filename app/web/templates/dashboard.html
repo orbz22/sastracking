@@ -64,7 +64,7 @@
 
     <div class="sidebar-foot">
       Region <b>{{ region }}</b> · {{ industries|length }} industri<br>
-      Siap ditarik kurvanya: <b>{{ ready_for_curve }}</b> / {{ trends|length }}<br>
+      Siap ditarik kurvanya: <b>{{ ready_for_curve }}</b> dari {{ total_rows }}<br>
       {{ platform.note }}
       {% if last_day %}<br>Data terakhir: {{ last_day }}{% endif %}
     </div>
@@ -150,68 +150,60 @@
       </div>
       {% endif %}
 
-      <!-- ============ KPI ============ -->
-      <section class="kpis" aria-label="Ringkasan metrik">
+      <!-- ============ ringkasan ============
+           Satu angka utama yang lebar + tiga angka pendukung berbagi satu
+           papan. Hierarki dibaca dari ukuran, bukan dari empat kartu identik. -->
+      <section class="stats" aria-label="Ringkasan metrik">
 
-        <div class="card kpi">
-          <div class="kpi-top">
-            <span class="kpi-label">Tren dilacak</span>
-            <span class="kpi-icon">{{ ui.icon("hash") }}</span>
-          </div>
-          <div class="kpi-value num">{{ total_rows }}</div>
-          <div class="kpi-foot">
-            <span>{{ days }} hari data terkumpul</span>
-            {% if spark_trends %}{{ spark(spark_trends) }}
-            {% else %}<span class="spark-empty">butuh ≥2 hari</span>{% endif %}
-          </div>
+        <div class="card stat-lead">
+          <span class="label">Sedang viral</span>
+          <span class="value num">{{ viral_count }}</span>
+          <span class="sub">
+            {{ (viral_count / total_rows * 100)|round|int if total_rows else 0 }}%
+            dari {{ total_rows }} tren — 10% teratas tiap kohort industri
+          </span>
         </div>
 
-        <div class="card kpi accent">
-          <div class="kpi-top">
-            <span class="kpi-label">Sedang viral</span>
-            <span class="kpi-icon">{{ ui.icon("flame") }}</span>
+        <div class="card stat-grid">
+          <div class="stat-cell">
+            <span class="label">Tren dilacak</span>
+            <span class="value num">{{ total_rows }}</span>
+            <span class="sub">
+              {{ days }} hari terkumpul
+              {% if spark_trends %}{{ spark(spark_trends) }}{% endif %}
+            </span>
           </div>
-          <div class="kpi-value num">{{ viral_count }}</div>
-          <div class="kpi-foot">
-            <span>{{ (viral_count / total_rows * 100)|round|int if total_rows else 0 }}% dari tren terlacak</span>
-          </div>
-        </div>
 
-        <div class="card kpi">
-          <div class="kpi-top">
-            <span class="kpi-label">Total views</span>
-            <span class="kpi-icon">{{ ui.icon("eye") }}</span>
+          <div class="stat-cell">
+            <span class="label">Total views</span>
+            <span class="value num">{{ total_views|compact }}</span>
+            <span class="sub">
+              {% if spark_views and spark_views.delta is not none %}
+                <span class="delta {{ 'up' if spark_views.delta >= 0 else 'down' }}">
+                  {{ spark_views.delta|pct(1) }}
+                </span>
+                <span>jendela {{ spark_period }} hari</span>
+                {{ spark(spark_views) }}
+              {% else %}
+                <span class="spark-empty">butuh ≥2 hari data</span>
+              {% endif %}
+            </span>
           </div>
-          <div class="kpi-value num">{{ total_views|compact }}</div>
-          <div class="kpi-foot">
-            {% if spark_views and spark_views.delta is not none %}
-              <span class="delta {{ 'up' if spark_views.delta >= 0 else 'down' }}"
-                    title="Perubahan total views pada jendela {{ spark_period }} hari, {{ days }} hari terakhir">
-                {{ spark_views.delta|pct(1) }}
-              </span>
-              {{ spark(spark_views) }}
-            {% else %}
-              <span class="spark-empty">tren butuh ≥2 hari data</span>
-            {% endif %}
-          </div>
-        </div>
 
-        <div class="card kpi">
-          <div class="kpi-top">
-            <span class="kpi-label">Momentum naik</span>
-            <span class="kpi-icon">{{ ui.icon("trending") }}</span>
-          </div>
-          <div class="kpi-value num">{{ rising }}</div>
-          <div class="kpi-foot" style="flex-direction:column;align-items:stretch;gap:7px">
-            {% if mix %}
-            <div class="mix" role="img"
+          <div class="stat-cell">
+            <span class="label">Momentum naik</span>
+            <span class="value num">{{ rising }}</span>
+            <span class="sub" style="display:block">
+              {% if mix %}
+              <span class="mix" role="img"
                  aria-label="Komposisi status: {% for m in mix %}{{ m.n }} {{ m.key }}{% if not loop.last %}, {% endif %}{% endfor %}">
-              {% for m in mix %}<span class="s-{{ m.key }}" style="width:{{ m.pct }}%"></span>{% endfor %}
-            </div>
-            <div class="mix-legend">
-              {% for m in mix %}<span><i class="s-{{ m.key }}" style="background:var(--{{ {'naik':'up','puncak':'peak','turun':'down','baru':'new'}[m.key] }})"></i>{{ m.key }} {{ m.n }}</span>{% endfor %}
-            </div>
-            {% else %}<span class="spark-empty">belum ada data</span>{% endif %}
+                {% for m in mix %}<span class="s-{{ m.key }}" style="width:{{ m.pct }}%"></span>{% endfor %}
+              </span>
+              <span class="mix-legend">
+                {% for m in mix %}<span><i class="s-{{ m.key }}"></i>{{ m.key }} {{ m.n }}</span>{% endfor %}
+              </span>
+              {% else %}<span class="spark-empty">belum ada data</span>{% endif %}
+            </span>
           </div>
         </div>
       </section>
@@ -355,9 +347,7 @@
         {% endif %}
       </section>
 
-      <p style="font-size:11.5px;color:var(--text-3);text-align:center;margin:8px 0 0">
-        sastracking — modul Viral Trend Intelligence dari platform SA SINC
-      </p>
+      <p class="colophon">sastracking — modul Viral Trend Intelligence dari platform SA SINC</p>
     </main>
   </div>
 </div>

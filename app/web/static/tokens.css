@@ -1,0 +1,154 @@
+/* Hallmark · genre: editorial · macrostructure: none (layar aplikasi, bukan landing)
+ * theme: SA SINC house (ink-navy + terracotta, dipertahankan dari brand PDF)
+ * nav: N3 side-rail · footer: Ft2 inline · enrichment: none (tipografi saja)
+ * pre-emit critique: P5 H4 E4 S5 R4 V4
+ *
+ * Sumber kebenaran untuk warna, jarak, ukuran teks, radius, dan easing.
+ * app.css TIDAK BOLEH memuat nilai warna/font literal — semuanya lewat token.
+ *
+ * OKLCH, bukan hex: lightness-nya perseptual, jadi turunan tema gelap bisa
+ * diambil dengan menggeser satu angka dan hasilnya tetap konsisten. Dengan hex,
+ * tiap langkah gelap harus dicocokkan dengan mata satu per satu.
+ */
+
+:root {
+  /* ---- tipografi -------------------------------------------------------
+     Dua keluarga, bukan satu. Display serif mengikuti brand PDF yang sudah
+     disetujui; body sans buat kerapatan data. Keduanya font sistem — tidak ada
+     permintaan jaringan, jadi aplikasi tetap utuh saat offline. */
+  --font-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
+
+  --text-2xs: 10.5px;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-base: 14px;
+  --text-md: 15.5px;
+  --text-lg: 19px;
+  --text-xl: 25px;
+  --text-display: 34px;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-body: 1.6;
+
+  /* ---- jarak: skala 4pt ---- */
+  --space-3xs: 4px;
+  --space-2xs: 8px;
+  --space-xs: 12px;
+  --space-sm: 16px;
+  --space-md: 24px;
+  --space-lg: 32px;
+  --space-xl: 48px;
+  --space-2xl: 64px;
+
+  /* ---- bentuk ---- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --rule: 1px;
+  --sidebar-w: 244px;
+
+  /* ---- gerak ---- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 320ms;
+
+  /* ---- permukaan (terang) -------------------------------------------------
+     Tidak ada putih murni: kertas dihangatkan ke arah hue brand supaya tidak
+     terbaca sintetis. */
+  --paper: oklch(98.6% 0.004 60);
+  --surface: oklch(99.5% 0.002 60);
+  --surface-2: oklch(96.8% 0.005 60);
+  --line: oklch(90.5% 0.006 60);
+  --line-strong: oklch(83% 0.008 60);
+
+  /* ---- tinta ---- */
+  --ink: oklch(27% 0.022 248);
+  --ink-2: oklch(46% 0.02 248);
+  /* 53%, bukan 60%: diukur di atas --surface-2 (latar tergelap yang dipakai
+     teks sekunder), 60% cuma dapat 3,60:1 — di bawah ambang 4,5:1 */
+  --ink-3: oklch(53% 0.019 248);
+  --on-brand: oklch(99% 0.005 60);
+  --on-nav: oklch(97% 0.004 60);
+  --on-nav-2: oklch(78% 0.02 248);
+  --nav-label: oklch(62% 0.025 248);
+
+  /* ---- brand ---- */
+  --brand: oklch(52% 0.155 32);
+  --brand-strong: oklch(46% 0.16 32);
+  --brand-soft: oklch(95.5% 0.022 32);
+  --nav: oklch(22% 0.028 248);
+  --nav-2: oklch(29% 0.03 248);
+  --chart-2: oklch(38% 0.07 245);
+
+  /* ---- status: selalu berpasangan dengan ikon/teks, tidak pernah warna saja ---- */
+  --up: oklch(50% 0.11 155);
+  --up-soft: oklch(95% 0.03 155);
+  --peak: oklch(53% 0.115 68);
+  --peak-soft: oklch(95.5% 0.035 68);
+  --down: oklch(53% 0.16 27);
+  --down-soft: oklch(95.5% 0.03 27);
+  --new: oklch(57% 0.02 248);
+  --new-soft: oklch(95% 0.006 248);
+
+  /* ---- elevasi ---- */
+  --shadow-sm: 0 1px 2px oklch(27% 0.022 248 / 0.06);
+  --shadow: 0 1px 2px oklch(27% 0.022 248 / 0.05),
+            0 6px 20px oklch(27% 0.022 248 / 0.06);
+  --shadow-lg: 0 20px 50px oklch(20% 0.02 248 / 0.28);
+  --scrim: oklch(22% 0.028 248 / 0.55);
+  --focus-ring: 0 0 0 3px oklch(52% 0.155 32 / 0.4);
+
+  /* ---- lapisan ---- */
+  --z-sticky: 20;
+  --z-overlay: 40;
+}
+
+/* Tema gelap dipilih, bukan dibalik: tiap langkah diturunkan sendiri terhadap
+   permukaan gelap. Membalik nilai terang menghasilkan aksen yang terlalu jenuh
+   dan teks sekunder yang tenggelam. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: oklch(17.5% 0.014 248);
+    --surface: oklch(21.5% 0.016 248);
+    --surface-2: oklch(25.5% 0.016 248);
+    --line: oklch(31% 0.016 248);
+    --line-strong: oklch(40% 0.018 248);
+
+    --ink: oklch(93% 0.008 248);
+    --ink-2: oklch(78% 0.012 248);
+    --ink-3: oklch(64% 0.014 248);
+    --on-nav: oklch(96% 0.004 60);
+    --on-nav-2: oklch(74% 0.02 248);
+    --nav-label: oklch(58% 0.025 248);
+
+    --brand: oklch(66% 0.145 34);
+    --brand-strong: oklch(72% 0.15 34);
+    --brand-soft: oklch(28% 0.05 32);
+    --nav: oklch(14% 0.014 248);
+    --nav-2: oklch(24% 0.018 248);
+    --chart-2: oklch(66% 0.09 245);
+
+    --up: oklch(74% 0.13 155);
+    --up-soft: oklch(27% 0.05 155);
+    --peak: oklch(76% 0.12 68);
+    --peak-soft: oklch(28% 0.05 68);
+    --down: oklch(70% 0.15 27);
+    --down-soft: oklch(28% 0.06 27);
+    --new: oklch(70% 0.02 248);
+    --new-soft: oklch(26% 0.008 248);
+
+    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.4), 0 6px 20px oklch(0% 0 0 / 0.3);
+    --shadow-lg: 0 20px 50px oklch(0% 0 0 / 0.55);
+    --scrim: oklch(10% 0.01 248 / 0.66);
+    --focus-ring: 0 0 0 3px oklch(66% 0.145 34 / 0.45);
+  }
+}
