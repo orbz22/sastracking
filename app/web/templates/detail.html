@@ -45,6 +45,12 @@
           {{ ui.icon("layers") }} Halaman sumber
         </a>
         {% endif %}
+        {% if qr %}
+        <button class="btn btn-ghost" id="qr-open"
+                title="Scan pakai HP — hashtag ini langsung kebuka di aplikasi {{ platform.label }}">
+          {{ ui.icon("qr") }} Buka di HP
+        </button>
+        {% endif %}
         {% if trend.url %}
         <a class="btn btn-ghost" href="{{ trend.url }}" target="_blank" rel="noopener"
            title="Sering kosong kalau dibuka di web browser; normal di aplikasi HP — lihat catatan di bawah chart">
@@ -59,6 +65,28 @@
         </form>
       </div>
     </header>
+
+    {% if qr %}
+    {# <dialog> bawaan browser: Esc menutup + fokus terkunci tanpa kode tambahan #}
+    <dialog class="qr-dialog" id="qr-dlg" aria-labelledby="qr-title">
+      <h2 id="qr-title">Buka di aplikasi {{ platform.label }}</h2>
+      <p class="qr-sub">Scan pakai kamera HP — {{ trend.name }} langsung kebuka
+         di aplikasi. Halaman web sering kosong, aplikasi tidak.</p>
+      {# QR wajib di atas putih, di tema gelap sekalipun — pemindai butuh kontras #}
+      <div class="qr-box">{{ qr|safe }}</div>
+      <code class="qr-url">{{ trend.url }}</code>
+      <form method="dialog"><button class="btn">Tutup</button></form>
+    </dialog>
+    <script>
+      (() => {
+        const dlg = document.getElementById("qr-dlg");
+        document.getElementById("qr-open")
+                .addEventListener("click", () => dlg.showModal());
+        // klik di luar kotak = tutup
+        dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+      })();
+    </script>
+    {% endif %}
 
     <main class="content" id="main">
 

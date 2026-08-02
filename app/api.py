@@ -13,6 +13,7 @@ from app.detail import interest_series, refresh_detail
 from app.db import get_session, init_db
 from app.metrics import compute, mark_viral
 from app.models import Snapshot, Trend
+from app.qr import qr_svg
 from app.scrapers.creative_center import CreativeCenterScraper
 from app.scrapers.registry import DEFAULT_PLATFORM, PLATFORMS, get_platform
 
@@ -221,6 +222,9 @@ def trend_page(
             "period": period,
             # halaman sumber selalu ada selama source_id terekam; halaman tag
             # publik tidak selalu (lihat catatan di template)
+            # QR di-scan dari layar laptop -> hashtag kebuka di aplikasi HP,
+            # yang terbukti jalan sementara halaman web-nya sering kosong
+            "qr": qr_svg(trend.url) if trend.url else None,
             "source_url": (
                 f"{CreativeCenterScraper.DETAIL_URL.format(id=trend.source_id)}"
                 f"?region={trend.region}&period={period}"

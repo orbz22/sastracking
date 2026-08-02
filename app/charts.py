@@ -79,6 +79,13 @@ def line_chart(
     every = max(1, round(len(pts) / 6))
     peak_i = max(range(len(pts)), key=lambda i: pts[i][1])
 
+    # Label X: tiap `every` titik, plus titik terakhir — TAPI titik terakhir
+    # dilewati kalau terlalu mepet ke label sebelumnya, kalau tidak teksnya
+    # bertabrakan jadi "28/0730/07".
+    ticks = set(range(0, len(pts), every))
+    if len(pts) - 1 - max(ticks) >= every * 0.6:
+        ticks.add(len(pts) - 1)
+
     return {
         "w": w,
         "h": h,
@@ -94,7 +101,7 @@ def line_chart(
                 "y": round(coords[i][1], 1),
                 "date": pts[i][0].strftime("%d/%m/%y"),
                 "value": pts[i][1],
-                "tick": i % every == 0 or i == len(pts) - 1,
+                "tick": i in ticks,
                 "peak": i == peak_i,
             }
             for i in range(len(pts))
