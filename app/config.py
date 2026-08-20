@@ -12,6 +12,23 @@ class Settings(BaseSettings):
     # semua industri; nilai ini cuma dipakai sebagai default filter awal.
     vertical: str = "fnb"
     request_timeout: int = 20   # detik, buat httpx
+    # --- keamanan waktu dibuka ke internet (ngrok dsb) -----------------------
+    # Kosong = tanpa autentikasi. Aman selama cuma didengarkan di 127.0.0.1,
+    # TIDAK aman begitu di-tunnel keluar: /refresh itu POST yang menjalankan
+    # Chrome memakai sesi TikTok asli pemilik mesin. Isi keduanya sebelum
+    # membuka tunnel; scripts/share.ps1 menolak jalan kalau masih kosong.
+    auth_user: str = ""
+    auth_pass: str = ""
+    # Kredensial tingkat kedua: boleh menekan tombol aksi walaupun read_only
+    # menyala. Gunanya memisahkan "penonton boleh lihat" dari "saya boleh
+    # update dari jauh" — tanpa ini, sandi yang dibagikan ke penonton otomatis
+    # jadi sandi yang bisa menjalankan Chrome di mesin ini. Kosong = tidak ada
+    # jalur tulis dari jauh sama sekali.
+    admin_user: str = ""
+    admin_pass: str = ""
+    # True = POST ditolak untuk penonton biasa (refresh, tarik kurva). Pemegang
+    # kredensial admin tetap boleh.
+    read_only: bool = False
     # Sesi login Playwright. Default: profil terpisah `.pw-profile` (gitignore).
     # Buat pakai Chrome asli: set profile_dir ke folder "User Data" Chrome +
     # profile_subdir ke folder profilnya (mis. "Default" / "Profile 1").

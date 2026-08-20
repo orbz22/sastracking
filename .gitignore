@@ -11,3 +11,5 @@ data/*.sqlite
 .mypy_cache/
 *.log
 .DS_Store
+# biner ngrok yang diunduh share.ps1 — bukan bagian dari kode
+tools/

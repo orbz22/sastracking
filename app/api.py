@@ -1,7 +1,9 @@
+import base64
+import secrets
 from contextlib import asynccontextmanager
 from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,6 +29,54 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 templates = Jinja2Templates(directory="app/web/templates")
+
+
+@app.middleware("http")
+async def _gerbang(request: Request, call_next):
+    """Autentikasi + kunci tulis. Dipakai waktu app dibuka lewat tunnel.
+
+    Tanpa ini, siapa pun yang tahu URL ngrok bisa menekan /refresh dan
+    menjalankan Chrome dengan sesi TikTok pemilik mesin. Kalau AUTH_USER kosong
+    gerbang dilewati sepenuhnya, jadi jalan lokal tetap seperti biasa.
+    """
+    # Tanpa gerbang (jalan lokal) pemakainya = pemilik mesin, jadi boleh apa saja.
+    admin = True
+
+    if settings.auth_user:
+        nama = sandi = ""
+        head = request.headers.get("authorization", "")
+        if head.startswith("Basic "):
+            try:
+                nama, _, sandi = (
+                    base64.b64decode(head[6:]).decode("utf-8").partition(":")
+                )
+            except Exception:  # noqa: BLE001 — header rusak = gagal, titik
+                nama = sandi = ""
+
+        # compare_digest: hindari bocornya panjang/isi sandi lewat timing.
+        # Kedua cek selalu dijalankan supaya waktu responsnya tidak membocorkan
+        # akun mana yang cocok.
+        penonton = secrets.compare_digest(
+            nama, settings.auth_user
+        ) and secrets.compare_digest(sandi, settings.auth_pass)
+        admin = bool(settings.admin_pass) and (
+            secrets.compare_digest(nama, settings.admin_user)
+            and secrets.compare_digest(sandi, settings.admin_pass)
+        )
+        if not (penonton or admin):
+            return Response(
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="SAS Tracking"'},
+            )
+
+    # read_only mengunci penonton, bukan pemegang kredensial admin
+    boleh_tulis = admin or not settings.read_only
+    request.state.read_only = not boleh_tulis
+
+    if not boleh_tulis and request.method not in ("GET", "HEAD", "OPTIONS"):
+        return Response(status_code=403, content="Mode lihat-saja: aksi dimatikan.")
+
+    return await call_next(request)
 
 
 def _compact(n) -> str:
@@ -224,6 +274,9 @@ def trend_page(
         name="detail.html",
         context={
             "app_name": settings.app_name,
+            # per-permintaan, bukan global: admin melihat tombolnya aktif
+            # walaupun penonton lain di link yang sama melihatnya mati
+            "read_only": getattr(request.state, "read_only", settings.read_only),
             "region": settings.region,
             "platform": get_platform(trend.platform),
             "platforms": list(PLATFORMS.values()),
@@ -294,15 +347,17 @@ def trend_detail(trend_id: int, session: Session = Depends(get_session)):
 def refresh(
     quick: bool = False,
     platform: str = DEFAULT_PLATFORM,
-    details: int = Query(0, ge=0, le=500, description="jumlah kurva ikut ditarik"),
+    details: int = Query(50, ge=0, le=500, description="jumlah kurva ikut ditarik"),
 ):
     """Mulai ambil data baru di background lalu balik ke dashboard.
 
-    quick=True: hanya F&B periode 7 hari (~30 detik) buat cek cepat.
-    Penuh: semua industri × 3 periode — puluhan menit, lihat catatan di M7.
-    details=N: sekalian tarik kurva N tren teratas (~13 detik per tren).
+    Satu tombol menarik semuanya: daftar tren + snapshot harian + kurva. Dulu
+    kurva punya tombol sendiri dan gampang lupa diklik, jadi kurvanya basi.
+
+    quick=True: hanya F&B periode 7 hari buat cek cepat — kurva dilewati supaya
+    tetap cepat.
     """
-    kwargs: dict = {"platform": platform, "details": details}
+    kwargs: dict = {"platform": platform, "details": 0 if quick else details}
     if quick:
         kwargs |= {"periods": (7,), "industries": ("Food & Beverage",)}
     jobs.start_refresh(**kwargs)  # kalau sudah jalan, diabaikan
@@ -401,6 +456,9 @@ def dashboard(
         name="dashboard.html",
         context={
             "app_name": settings.app_name,
+            # per-permintaan, bukan global: admin melihat tombolnya aktif
+            # walaupun penonton lain di link yang sama melihatnya mati
+            "read_only": getattr(request.state, "read_only", settings.read_only),
             "region": settings.region,
             "platform": plat,
             "platforms": list(PLATFORMS.values()),
