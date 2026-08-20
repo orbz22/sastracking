@@ -104,9 +104,14 @@ def sync_many(
 ) -> dict:
     """Tarik kurva untuk banyak tren sekaligus, tanpa perlu diklik satu-satu.
 
-    Menarik SEMUA tren tidak masuk akal (~13 detik × ribuan baris = berjam-jam),
-    jadi diprioritaskan: yang punya id sumber, views terbesar duluan. Dipakai
-    oleh job harian supaya kurvanya sudah siap sebelum dibuka orang.
+    Menarik SEMUA tren tidak masuk akal (~7 detik × ribuan baris = berjam-jam),
+    jadi `limit` selalu ada dan urutannya yang menentukan mana yang kebagian:
+    belum punya kurva duluan, lalu yang kurvanya paling basi, baru yang paling
+    ramai. Tanpa aturan basi itu, `only_missing=False` cuma akan menarik ulang
+    50 tren teratas yang itu-itu saja tiap hari.
+
+    `only_missing=True` melewati yang sudah punya kurva sama sekali — cepat,
+    tapi kurva lama jadi tidak pernah disegarkan.
     """
     semua = list(s.exec(select(Trend).where(Trend.platform == platform)).all())
     candidates = [t for t in semua if t.source_id]
@@ -114,22 +119,32 @@ def sync_many(
     # halaman detailnya. Dilaporkan biar jelas kenapa jumlahnya nggak sesuai.
     no_source = len(semua) - len(candidates)
 
-    if only_missing:
-        punya = {
-            p.trend_id
-            for p in s.exec(
-                select(InterestPoint).where(InterestPoint.period == period)
-            ).all()
-        }
-        candidates = [t for t in candidates if t.id not in punya]
+    # kapan kurva tiap tren terakhir ditarik (kosong = belum punya sama sekali)
+    ditarik: dict[int, datetime] = {}
+    for p in s.exec(
+        select(InterestPoint).where(InterestPoint.period == period)
+    ).all():
+        seen = ditarik.get(p.trend_id)
+        stamp = p.fetched_at or datetime.min
+        if seen is None or stamp > seen:
+            ditarik[p.trend_id] = stamp
 
-    # urutkan pakai views snapshot terakhir -> yang paling ramai duluan
+    if only_missing:
+        candidates = [t for t in candidates if t.id not in ditarik]
+
     views: dict[int, int] = {}
     for snap in s.exec(
         select(Snapshot).where(Snapshot.period == period)
     ).all():
         views[snap.trend_id] = max(views.get(snap.trend_id, 0), snap.views or 0)
-    candidates.sort(key=lambda t: views.get(t.id, 0), reverse=True)
+
+    candidates.sort(
+        key=lambda t: (
+            t.id in ditarik,                    # belum punya kurva -> duluan
+            ditarik.get(t.id) or datetime.min,  # lalu yang paling basi
+            -views.get(t.id, 0),                # baru yang paling ramai
+        )
+    )
     picked = candidates[:limit]
     if not picked:
         return {"picked": 0, "saved": 0, "points": 0, "tanpa_id_sumber": no_source}
@@ -161,6 +176,8 @@ def sync_many(
 
     return {
         "picked": len(picked),
+        "baru": sum(1 for t in picked if t.id not in ditarik),
+        "disegarkan": sum(1 for t in picked if t.id in ditarik),
         "saved": saved,
         "points": points,
         "period": period,

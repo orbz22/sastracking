@@ -97,6 +97,7 @@ def run_pipeline(
     new_trends = 0
     snaps = 0
     failed = 0
+    out_curves: dict | None = None
     today = date.today()
 
     with Session(engine) as s:
@@ -135,14 +136,24 @@ def run_pipeline(
             from app.detail import sync_many  # lokal: hindari impor melingkar
 
             try:
-                print(
-                    "[detail]",
-                    sync_many(s, limit=details, period=periods[0], platform=plat.key),
+                # only_missing=False: kurva yang sudah ada ikut disegarkan, bukan
+                # cuma yang kosong. Tanpa ini kurva lama membeku selamanya —
+                # nilainya indeks relatif yang bergeser tiap hari.
+                curves = sync_many(
+                    s,
+                    limit=details,
+                    period=periods[0],
+                    platform=plat.key,
+                    only_missing=False,
                 )
+                print("[detail]", curves)
+                out_curves = curves
             except Exception as e:  # noqa: BLE001
                 print(f"[warn] tarik kurva gagal: {type(e).__name__}: {e}")
 
     out = {"new_trends": new_trends, "snapshots": snaps, "platform": plat.key}
+    if out_curves:
+        out["kurva"] = f"{out_curves['saved']} tren, {out_curves['points']} titik"
     if failed:
         out["failed"] = failed
         print(f"[warn] {failed} baris gagal disimpan (sisanya tetap tersimpan)")
