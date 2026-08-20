@@ -13,11 +13,8 @@
 <div class="shell">
   <nav class="sidebar" aria-label="Navigasi utama">
     <div class="brand">
-      <span class="brand-mark">{{ ui.icon("pulse") }}</span>
-      <span>
-        <span class="brand-name">sastracking</span>
-        <span class="brand-sub">SA SINC</span>
-      </span>
+      <span class="brand-name">sastracking</span>
+      <span class="brand-sub">by SA SINC</span>
     </div>
     <div class="nav-label">Menu</div>
     <a class="nav-item" href="/?platform={{ platform.key }}">{{ ui.icon("grid") }} Dashboard</a>
@@ -58,8 +55,9 @@
         </a>
         {% endif %}
         <form method="post" action="/t/{{ trend.id }}/sync?period={{ period }}">
-          <button class="btn" {% if not trend.source_id %}disabled
-            title="Perlu scrape ulang dulu supaya link detailnya terekam"{% endif %}>
+          <button class="btn"
+            {% if read_only %}disabled title="Mode lihat-saja — penarikan data cuma bisa dari mesin tempat app ini hidup"
+            {% elif not trend.source_id %}disabled title="Perlu scrape ulang dulu supaya link detailnya terekam"{% endif %}>
             {{ ui.icon("refresh") }} Tarik dari sumber
           </button>
         </form>
@@ -95,7 +93,7 @@
           <div class="kpi-top"><span class="kpi-label">Views</span>
             <span class="kpi-icon">{{ ui.icon("eye") }}</span></div>
           <div class="kpi-value num">{{ row.views|compact }}</div>
-          <div class="kpi-foot"><span>jendela {{ row.period or period }} hari</span></div>
+          <div class="kpi-foot"><span>Periode {{ row.period or period }} hari</span></div>
         </div>
         <div class="card kpi">
           <div class="kpi-top"><span class="kpi-label">Posts</span>
@@ -134,8 +132,8 @@
       <section class="card">
         <div class="card-head">
           <h2>Interest over time</h2>
-          <span class="hint">kurva dari {{ platform.label }} · jendela {{ period }} hari</span>
-          {# cuma jendela yang trennya benar-benar punya datanya #}
+          <span class="hint">kurva dari {{ platform.label }} · Periode {{ period }} hari</span>
+          {# cuma Periode yang trennya benar-benar punya datanya #}
           <span class="seg" style="margin-left:auto">
             {% for p in available_periods or [period] %}
             <a href="/t/{{ trend.id }}?period={{ p }}"
@@ -281,18 +279,18 @@
       <!-- histori yang kita bangun sendiri -->
       <section class="card">
         <div class="card-head">
-          <h2>Histori kita</h2>
-          <span class="hint">views absolut · jendela {{ period }} hari</span>
+          <h2>Histori</h2>
+          <span class="hint">views absolut · Periode {{ period }} hari</span>
         </div>
         {% if own_history|length > 1 %}
         <div class="table-wrap">
           <table>
             <thead><tr>
               <th scope="col">Tanggal</th><th scope="col" class="right">Views</th>
-              <th scope="col">Jendela</th>
+              <th scope="col">Periode</th>
             </tr></thead>
             <tbody>
-              {% for h in own_history %}
+              {% for h in own_history|reverse %}
               <tr>
                 <td>{{ h.date }}</td>
                 <td class="right num">{{ h.views|compact }}</td>
@@ -306,7 +304,7 @@
         <div class="empty">
           {{ ui.icon("inbox") }}
           <h3>Baru {{ own_history|length }} hari data</h3>
-          <p>Velocity butuh minimal 2 hari pada jendela yang sama. Histori bertambah
+          <p>Velocity butuh minimal 2 hari pada Periode yang sama. Histori bertambah
              tiap kali sapuan harian dijalankan.</p>
         </div>
         {% endif %}

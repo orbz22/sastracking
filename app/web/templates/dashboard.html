@@ -24,11 +24,8 @@
   <!-- ============ sidebar ============ -->
   <nav class="sidebar" aria-label="Navigasi utama">
     <div class="brand">
-      <span class="brand-mark">{{ ui.icon("pulse") }}</span>
-      <span>
-        <span class="brand-name">sastracking</span>
-        <span class="brand-sub">SA SINC</span>
-      </span>
+      <span class="brand-name">sastracking</span>
+      <span class="brand-sub">by SA SINC</span>
     </div>
 
     <div class="nav-label">Platform</div>
@@ -75,29 +72,21 @@
 
     <header class="topbar">
       <div>
-        <h1>Tren {{ platform.label }} — {{ region }}</h1>
-        <div class="crumb">{{ platform.label }} / {{ category|capitalize }} / {{ industry or "Semua industri" }}</div>
+        <h1>{{ platform.label }} Trends</h1>
+        <div class="crumb">{{ region }} &nbsp;&middot;&nbsp; {{ category|capitalize }} &nbsp;&middot;&nbsp; {{ industry or "Semua Industri" }}</div>
       </div>
       <div class="topbar-right">
-        <form method="post" action="/details/sync?limit=50&amp;platform={{ platform.key }}">
-          <button class="btn btn-ghost" {% if job.running or not ready_for_curve %}disabled{% endif %}
-                  title="{% if ready_for_curve %}Tarik kurva 'Interest over time' 50 tren teratas sekaligus (~11 menit). Hanya tren yang sudah punya ID sumber ({{ ready_for_curve }} tren) yang bisa ditarik.{% else %}Belum ada tren yang punya ID sumber — jalankan 'Ambil data baru' dulu{% endif %}">
-            {{ ui.icon("trending") }} Tarik kurva
-          </button>
-        </form>
-        <form method="post" action="/refresh?platform={{ platform.key }}">
-          <button class="btn" {% if job.running %}disabled{% endif %}>
+        <form method="post" action="/refresh?platform={{ platform.key }}&amp;details=50">
+          <button class="btn" {% if job.running or read_only %}disabled{% endif %}
+                  title="{% if read_only %}Mode lihat-saja — pengambilan data cuma bisa dijalankan dari mesin tempat app ini hidup.{% else %}Sapu ulang daftar tren, simpan snapshot hari ini, sekalian tarik &amp; segarkan kurva 50 tren yang paling butuh (yang belum punya kurva duluan, lalu yang paling basi).{% endif %}">
             {{ ui.icon("refresh") }}
-            {% if job.running %}Sedang berjalan…{% else %}Ambil data baru{% endif %}
+            {% if job.running %}Sedang berjalan…{% elif read_only %}Lihat-saja{% else %}Ambil data baru{% endif %}
           </button>
         </form>
-        <div class="user">
-          <span class="avatar" aria-hidden="true">SA</span>
-          <span>
-            <span class="user-name">SA SINC</span><br>
-            <span class="user-role">Viral Intelligence</span>
-          </span>
-        </div>
+        <button class="btn" type="button" id="login-btn"
+                title="Login dummy — autentikasi belum aktif">
+          Masuk
+        </button>
       </div>
     </header>
 
@@ -108,7 +97,8 @@
       <div class="job run" role="status" aria-live="polite">
         <span class="spin"></span>
         <span><b>Mengambil data baru…</b> jendela Chrome akan terbuka — jangan ditutup.
-        Berjalan {{ job.elapsed }} detik (biasanya ~3 menit). Halaman menyegarkan sendiri.</span>
+        Berjalan {{ job.elapsed }} detik{% if job.eta_text %} (perkiraan {{ job.eta_text }}){% endif %}.
+        Halaman menyegarkan sendiri.</span>
       </div>
       {% elif job.error %}
       <div class="job err" role="alert">
@@ -125,7 +115,7 @@
 
       <!-- filter -->
       <div class="filters">
-        <span class="lbl">Jendela</span>
+        <span class="lbl">Periode</span>
         <span class="seg">
           <a href="{{ q(state, period=None) }}" aria-current="{{ 'true' if not period else 'false' }}">Semua</a>
           {% for p in [7, 30, 90] %}
@@ -186,7 +176,7 @@
           <div class="kpi-foot">
             {% if spark_views and spark_views.delta is not none %}
               <span class="delta {{ 'up' if spark_views.delta >= 0 else 'down' }}"
-                    title="Perubahan total views pada jendela {{ spark_period }} hari, {{ days }} hari terakhir">
+                    title="Perubahan total views pada Periode {{ spark_period }} hari, {{ days }} hari terakhir">
                 {{ spark_views.delta|pct(1) }}
               </span>
               {{ spark(spark_views) }}
@@ -248,15 +238,15 @@
             <div class="empty">
               {{ ui.icon("inbox") }}
               <h3>Belum ada angka {{ metric }}</h3>
-              <p>{% if metric == 'velocity' %}Velocity butuh minimal 2 hari data pada jendela yang sama.
+              <p>{% if metric == 'velocity' %}Velocity butuh minimal 2 hari data pada Periode yang sama.
                  Jalankan “Ambil data baru” besok lagi.{% else %}Belum ada tren pada filter ini.{% endif %}</p>
             </div>
             {% endif %}
           </div>
           {% if bars %}
           <div class="note">
-            {% if metric == 'velocity' %}Velocity = Δviews per hari antar dua snapshot terakhir pada jendela sama.
-            {% else %}Views = angka kumulatif dari sumber pada jendela yang dipilih.{% endif %}
+            {% if metric == 'velocity' %}Velocity = Δviews per hari antar dua snapshot terakhir pada Periode sama.
+            {% else %}Views = angka kumulatif dari sumber pada Periode yang dipilih.{% endif %}
           </div>
           {% endif %}
         </div>
@@ -295,7 +285,7 @@
             {% if total_rows > table_limit %}
               {{ table_limit }} teratas dari {{ total_rows }} baris
             {% else %}{{ total_rows }} baris{% endif %}
-            {%- if period %} · jendela {{ period }} hari{% endif %}
+            {%- if period %} · Periode {{ period }} hari{% endif %}
           </span>
         </div>
 
@@ -308,7 +298,7 @@
                 <th scope="col">Hashtag</th>
                 <th scope="col" class="right">Views</th>
                 <th scope="col" class="right">Posts</th>
-                <th scope="col">Jendela</th>
+                <th scope="col">Periode</th>
                 <th scope="col" class="right">Velocity/hari</th>
                 <th scope="col">Status</th>
               </tr>
@@ -320,7 +310,7 @@
                 <td class="c-name">
                   <a href="/t/{{ t.id }}{% if period %}?period={{ period }}{% endif %}">{{ t.name }}</a>
                   {% if t.is_viral %}<span class="pill-viral"
-                     title="{% if t.cohort_rank %}Peringkat {{ t.cohort_rank }} dari {{ t.cohort_size }} di {{ t.industry or 'kohort sisa' }} · jendela {{ t.period }} hari{% else %}Ambang absolut (kohort terlalu kecil untuk diperingkat){% endif %}"
+                     title="{% if t.cohort_rank %}Peringkat {{ t.cohort_rank }} dari {{ t.cohort_size }} di {{ t.industry or 'kohort sisa' }} · Periode {{ t.period }} hari{% else %}Ambang absolut (kohort terlalu kecil untuk diperingkat){% endif %}"
                      >{{ ui.icon("flame") }}Viral</span>{% endif %}
                   <div class="c-sub">{{ t.industry or "—" }}</div>
                 </td>
@@ -337,11 +327,11 @@
           </table>
         </div>
         <div class="note">
-          Kolom <b>Jendela</b> = rentang data sumber (7/30/90 hari); views antar-jendela tidak sebanding —
-          90 hari bersifat kumulatif. Velocity butuh ≥2 hari data pada jendela yang sama;
+          Kolom <b>Periode</b> = rentang data sumber (7/30/90 hari); views antar-periode tidak sebanding —
+          90 hari bersifat kumulatif. Velocity butuh ≥2 hari data pada Periode yang sama;
           status “baru” berarti data belum cukup untuk dinilai.
           Label <b>Viral</b> bersifat relatif: 10% teratas di dalam kohortnya sendiri
-          (industri + jendela yang sama), bukan ambang views tetap — arahkan kursor ke labelnya
+          (industri + Periode yang sama), bukan ambang views tetap — arahkan kursor ke labelnya
           untuk lihat peringkatnya. Tren yang sudah punya histori diperingkat berdasarkan
           velocity, yang masih baru berdasarkan views.
         </div>
@@ -361,5 +351,15 @@
     </main>
   </div>
 </div>
+<script>
+document.getElementById("login-btn").addEventListener("click", function () {
+  var t = document.createElement("div");
+  t.className = "toast show";
+  t.textContent = "Login belum tersedia — mode demo";
+  document.body.appendChild(t);
+  setTimeout(function () { t.classList.remove("show"); }, 1800);
+  setTimeout(function () { t.remove(); }, 2200);
+});
+</script>
 </body>
 </html>
